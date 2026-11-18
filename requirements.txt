@@ -1,0 +1,6 @@
+# Python 3.12 で確認（2026-11-15）。make_face.sh は tools/mpfb/.venv の Python を使う（setup.sh が作る）
+numpy==2.5.4
+scipy==1.18.1
+opencv-contrib-python==5.0.0.93
+pillow==12.3.0
+mediapipe==1.1.0

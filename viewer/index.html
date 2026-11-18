@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>顔の確認</title>
+<script type="importmap">
+{"imports":{
+  "three":"https://cdn.jsdelivr.net/npm/three@0.183.2/build/three.module.min.js",
+  "three/addons/":"https://cdn.jsdelivr.net/npm/three@0.183.2/examples/jsm/",
+  "@pixiv/three-vrm":"https://cdn.jsdelivr.net/npm/@pixiv/three-vrm@3.5.5/lib/three-vrm.module.min.js"
+}}
+</script>
+<style>
+  :root { --bg: #1d1f22; --panel: #26292dee; --fg: #e8e8e8; --sub: #a0a4aa; --line: #3a3e44; --accent: #6aa9ff; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg); font: 13px/1.5 system-ui, sans-serif; overflow: hidden; }
+  canvas { display: block; }
+  #panel { position: fixed; top: 10px; right: 10px; width: 270px; max-height: calc(100% - 20px); overflow-y: auto; background: var(--panel);
+           border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; box-sizing: border-box; }
+  h2 { font-size: 13px; margin: 10px 0 4px; color: var(--sub); font-weight: 600; }
+  h2:first-child { margin-top: 0; }
+  .row { display: grid; grid-template-columns: 96px 1fr 30px; gap: 6px; align-items: center; }
+  .row span:last-child { text-align: right; color: var(--sub); font-variant-numeric: tabular-nums; }
+  input[type=range] { width: 100%; }
+  label.chk { display: block; margin: 2px 0; }
+  button { background: #33373c; color: var(--fg); border: 1px solid var(--line); border-radius: 5px; padding: 4px 8px; cursor: pointer; }
+  button:hover { border-color: var(--accent); }
+  details summary { cursor: pointer; color: var(--sub); margin: 8px 0 4px; }
+  #msg { position: fixed; left: 12px; bottom: 10px; color: var(--sub); }
+  #drop { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; background: #000a; font-size: 18px; }
+  @media (max-width: 600px) { #panel { width: auto; left: 10px; top: auto; bottom: 10px; max-height: 45%; } }
+</style>
+</head>
+<body>
+<div id="panel">
+  <h2>表示</h2>
+  <label class="chk"><input type="checkbox" id="autoblink" checked> 自動でまばたき</label>
+  <div style="margin-top:6px"><button id="reset">表情をすべて 0 に</button></div>
+  <h2>表情（VRM の標準）</h2>
+  <div id="presets"></div>
+  <details><summary>細かい動き（ARKit の 52 個）</summary><div id="arkit"></div></details>
+</div>
+<div id="msg">VRM ファイルをここへドロップするか、?model=＜VRM の URL＞ で開きます</div>
+<div id="drop">ここで離すと開きます</div>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { VRMLoaderPlugin, VRMUtils } from '@pixiv/three-vrm';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+
+const PRESET_LABEL = { aa: 'あ', ih: 'い', ou: 'う', ee: 'え', oh: 'お', blink: 'まばたき', blinkLeft: '左目を閉じる', blinkRight: '右目を閉じる',
+  happy: '笑顔', angry: '怒り', sad: '悲しみ', surprised: '驚き', relaxed: '穏やか' };
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+document.body.prepend(renderer.domElement);
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x1d1f22);
+scene.add(new THREE.HemisphereLight(0xffffff, 0x404048, 1.6));
+const key = new THREE.DirectionalLight(0xffffff, 1.8); key.position.set(0.6, 1.2, 1.5); scene.add(key);
+const camera = new THREE.PerspectiveCamera(25, 1, 0.01, 50);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+const lookTarget = new THREE.Object3D(); scene.add(lookTarget);
+const resize = () => { renderer.setSize(innerWidth, innerHeight); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); };
+addEventListener('resize', resize); resize();
+
+let envTex = null;
+const roomEnv = () => envTex ??= new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(), 0.04).texture;
+let vrm = null, values = {}, blinkT = 3, blinkPhase = -1;
+const $ = (id) => document.getElementById(id);
+
+function slider(parent, name, label) {
+  const row = document.createElement('div'); row.className = 'row';
+  row.innerHTML = `<span>${label}</span><input type="range" min="0" max="1" step="0.01" value="0"><span>0</span>`;
+  const [, input, out] = row.children;
+  input.oninput = () => { values[name] = +input.value; out.textContent = (+input.value).toFixed(2); };
+  input.dataset.name = name;
+  parent.append(row);
+}
+
+async function open(url) {
+  $('msg').textContent = '読み込み中…';
+  const loader = new GLTFLoader(); loader.register((p) => new VRMLoaderPlugin(p));
+  const gltf = await loader.loadAsync(url);
+  if (vrm) { scene.remove(vrm.scene); VRMUtils.deepDispose(vrm.scene); }
+  vrm = gltf.userData.vrm;
+  VRMUtils.rotateVRM0(vrm);
+  scene.add(vrm.scene);
+  if (vrm.lookAt) vrm.lookAt.target = lookTarget;
+  // the cornea (its own glossy, clear material) mirrors a room, as apps with environment lighting do; this viewer has no
+  // environment, so only the one key light would reflect, and it falls under the upper lid. Only the cornea gets it.
+  vrm.scene.traverse((o) => { if (o.isMesh) for (const m of [].concat(o.material)) if (/cornea/i.test(m.name)) { m.envMap = roomEnv(); m.envMapIntensity = 0.3; m.needsUpdate = true; } });   // 0.3: 1.0 greyed the iris again
+  // the camera on the head (the model keeps the body's skeleton, so the head sits at standing height)
+  vrm.scene.updateMatrixWorld(true);
+  const c = vrm.humanoid.getNormalizedBoneNode('head').getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0, 0.07, 0));
+  controls.target.copy(c); camera.position.set(c.x, c.y, c.z + 0.9); controls.update();
+  // sliders
+  values = {}; $('presets').innerHTML = ''; $('arkit').innerHTML = '';
+  const em = vrm.expressionManager;
+  for (const n of Object.keys(PRESET_LABEL)) if (em.getExpression(n)) slider($('presets'), n, PRESET_LABEL[n]);
+  for (const e of em.customExpressions ?? []) slider($('arkit'), e.expressionName, e.expressionName);
+  $('msg').textContent = `${vrm.meta?.name ?? ''}　ドラッグで回す・ホイールで寄る`;
+}
+
+$('reset').onclick = () => { values = {}; document.querySelectorAll('#panel input[type=range]').forEach((i) => { i.value = 0; i.nextElementSibling.textContent = '0'; }); };
+
+const clock = new THREE.Clock();
+renderer.setAnimationLoop(() => {
+  const dt = clock.getDelta();
+  controls.update();
+  if (vrm) {
+    const em = vrm.expressionManager;
+    for (const e of em.expressions) em.setValue(e.expressionName, values[e.expressionName] ?? 0);
+    if ($('autoblink').checked && !(values.blink > 0)) {   // a blink every 2-5 s, 0.15 s long
+      blinkT -= dt;
+      if (blinkT < 0 && blinkPhase < 0) blinkPhase = 0;
+      if (blinkPhase >= 0) { blinkPhase += dt / 0.15; em.setValue('blink', Math.sin(Math.min(blinkPhase, 1) * Math.PI));
+        if (blinkPhase >= 1) { blinkPhase = -1; blinkT = 2 + Math.random() * 3; } }
+    }
+    if (vrm.lookAt) lookTarget.position.copy(camera.position);   // the eyes on the viewer (following the mouse was dropped: the gaze keys gave only left or right)
+    vrm.update(dt);
+  }
+  renderer.render(scene, camera);
+});
+
+addEventListener('dragover', (e) => { e.preventDefault(); $('drop').style.display = 'flex'; });
+addEventListener('dragleave', () => { $('drop').style.display = 'none'; });
+addEventListener('drop', (e) => { e.preventDefault(); $('drop').style.display = 'none';
+  const f = e.dataTransfer.files[0]; if (f) open(URL.createObjectURL(f)).catch((err) => { $('msg').textContent = '開けませんでした：' + err.message; }); });
+const m = new URLSearchParams(location.search).get('model');
+if (m) open(m).catch((err) => { $('msg').textContent = '開けませんでした：' + err.message; });
+window.viewer = { renderer, scene, camera, controls, get vrm() { return vrm; }, set(n, v) { values[n] = v; } };
+</script>
+</body>
+</html>

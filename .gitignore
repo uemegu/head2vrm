@@ -1,0 +1,10 @@
+# 人ごとの作業フォルダ（入力の GLB・途中のファイル・出力の VRM）
+work/
+# setup.sh が作るもの
+tools/mpfb/.venv/
+tools/mpfb/models/
+tools/mpfb/base_*/base_arkit.blend
+tools/mpfb/base_*/base_arkit.blend1
+tools/mpfb/base_*/.relinked
+__pycache__/
+.DS_Store
