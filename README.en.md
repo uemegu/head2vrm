@@ -37,13 +37,21 @@ cd head2vrm
 
 > If Blender, MPFB data, or Python 3.12 are installed in non-default locations, specify them via the `BLENDER`, `MPFB_DATA`, and `PYTHON` environment variables (for example: `PYTHON=/opt/homebrew/bin/python3.12 ./setup.sh`).
 
-## What to Prepare
+## What to Prepare (Input GLB Prerequisites)
 
-- Prepare a 3D head model in GLB format with a texture image mapped to the face.
-- The head should face forward with the mouth closed and eyes open, and be recognizable as a human face. Because the pipeline automatically detects eye, mouth, and nose landmarks from rendered face images, models that cannot be detected as a human face will not pass.
-- If your model has hair, the hair must be a separate part (separate mesh/object) from the head. Providing two GLBs exported from the same model—one **with hair** and one **without hair (face only)**—gives cleaner results around the forehead and hairline (a single GLB with hair separated as its own mesh also works).
-- If there is no hair, a single head GLB is enough.
+Your input 3D head model (GLB) must meet the following prerequisites:
+
+- **Pose & expression**: The head should face forward with the mouth closed and eyes open, and be recognizable as a human face. Because the pipeline automatically detects eye, mouth, and nose landmarks using MediaPipe, models that cannot be detected as a human face will not pass.
+- **Mesh separation (head vs. hair)**: If your model has hair, **the head (face) and hair must be separated into distinct meshes/objects** in the GLB (for example, from Tripo's part-split export or separated in Blender).
+  - Among parts with 300+ vertices, the tool automatically identifies **one head mesh** and **one hair mesh** based on skin-color ratio and height (if auto-detection misses, you can specify part indices via `HEAD_PART` / `HAIR_PART`).
+  - Providing two GLBs exported from the same model—one **with hair** and one **without hair (face only)**—gives cleaner results around the forehead and hairline (a single GLB with head and hair as separate meshes also works).
+  - If there is no hair, a single head GLB is enough.
+- **Naming & texture constraints**:
+  - Each mesh name in the GLB must end with an integer suffix such as `_0`, `_1` (e.g., `tripo_part_0`, `tripo_part_1`).
+  - The head mesh must have UVs and a texture image on its first material, with dimensions **4096×4096 or smaller**.
 - The final look is largely determined by your input head model, so it is worth checking that you are happy with the original face before starting.
+
+![Example of color-coded parts in an input GLB (Blue: hair mesh, Orange: head/face mesh)](docs/input_parts.png)
 
 ## Usage
 
