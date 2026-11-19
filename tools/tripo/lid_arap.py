@@ -1,7 +1,7 @@
-"""The lids' visible edges put on the Tripo head's own eye outline by an as-rigid-as-possible deformation.   any face
+"""The lids' visible edges put on the input head's own eye outline by an as-rigid-as-possible deformation.   any face
 python lid_arap.py OUT_DIR          (cwd: tripo/; run.sh calls it with LID_FIT=1; CHECK=1 only draws what is extracted)
 
-The view: lid_render.py VIEW=tripo, the viewer's "Tripo と同じ" camera. The target: MediaPipe's eye contour on the Tripo head
+The view: lid_render.py VIEW=tripo, the viewer's input-model view camera. The target: MediaPipe's eye contour on the input head
 rendered from it, one smooth line per lid (upper: cubic, lower: a quadratic Bezier bow), the ends on the corners. A person
 approves these lines first (run.sh; CHECK=1 writes lidfit/check.jpg, check_corners.jpg and check_lines.txt).
 
@@ -109,7 +109,7 @@ SCLERA_FRAC = float(os.environ.get("SCLERA_FRAC", 0.25))   # 0.5 stopped 1.5 mm 
 
 def caruncle_end(up, lo, img):
     """MediaPipe's inner corner is the caruncle's tip, but the base mesh has no caruncle: inside the opening there the eyeball's
-    white showed as a wedge where Tripo painted pink. Walk from that tip towards the eye's middle along the
+    white showed as a wedge where the input texture shows pink. Walk from that tip towards the eye's middle along the
     opening; the corner is where SCLERA_FRAC of the column between the lids is sclera (light, little colour) for 3 pixels running.
     up / lo: the ring's points, inner corner last. Returns the new inner corner, or None."""
     tip, other = up[-1], up[0]
@@ -137,7 +137,7 @@ tripo_img = cv2.imread(f'{W}/v0_tripo.png')
 
 def outer_tip(up, lo, img):
     """MediaPipe's outer corner can sit past and below the white's tip, on the line where the lash line and the waterline run on
-    (on one test head the left eye's outer corner came out 1.1 mm low). The corner goes to the tip of Tripo's painted white: of the
+    (on one test head the left eye's outer corner came out 1.1 mm low). The corner goes to the tip of the input's painted white: of the
     white pixels (Lab chroma < 9, L > 45 of 100) within 30 px of the corner, the outermost along the eye's axis (the median of the
     outer 3%). up / lo: the ring's points, outer corner first. Returns the new corner or None."""
     o, i = up[0], up[-1]
@@ -209,14 +209,14 @@ for up_ids, lo_ids in RINGS:
     x0, x1 = sorted((up[0, 0], up[-1, 0]))
     fu0, fl0 = (lambda c_: lambda x: np.polyval(c_, x))(cu), bow(lo)
     if os.environ.get('INSET', '1') == '1':
-        # MediaPipe's contour runs on the lash line above and under the waterline below: inside it Tripo painted the lid's grey rim
+        # MediaPipe's contour runs on the lash line above and under the waterline below: inside it the input texture shows the lid's grey rim
         # (above) and the pink waterline (below), and the eyeball only shows within those. Fitting the opening to the contour bared
         # the eyeball over both and the eyes looked wide open. Per eye, measured in the picture:
         # du = rows from the upper line down to the iris (lightness falls below 3/4 of the rim's), over the middle of the eye;
         # dl = rows from the lower line up to where it is no longer pink (a* 5 under the waterline's) or reaches the iris.
         # PER COLUMN (the white under the lid line should stay eyeball white, not turn to skin): one inset measured over the
-        # iris and used across the whole width covered the white Tripo painted right under the line by the corners. Now each column
-        # goes in only to where Tripo's eyeball begins: the white (chroma < 9, L > 30 of 100) or the iris (L < 28); below, past the
+        # iris and used across the whole width covered the white painted right under the line by the corners. Now each column
+        # goes in only to where the input's eyeball begins: the white (chroma < 9, L > 30 of 100) or the iris (L < 28); below, past the
         # pink waterline to the white (chroma < 9, L > 45) or the iris (L < 35). Smoothed along the eye (median, then mean, 9 px).
         labi = cv2.cvtColor(tripo_img, cv2.COLOR_BGR2LAB).astype(np.float32)
         Li = labi[..., 0] * 100 / 255; Ci = np.hypot(labi[..., 1] - 128, labi[..., 2] - 128)

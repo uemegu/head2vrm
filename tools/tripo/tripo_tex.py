@@ -1,6 +1,6 @@
-"""Skin texture for the warped basemesh from the Tripo colours: each texel takes the colour of the closest
-point on the Tripo surface; away from the head (or on the T-shirt) it falls back to the MPFB skin,
-recoloured to match the Tripo neck.
+"""Skin texture for the warped basemesh from the input head's colours: each texel takes the colour of the closest
+point on the input surface; away from the head (or on the T-shirt) it falls back to the MPFB skin,
+recoloured to match the input neck.
 
 python tripo_tex.py TEXELS_NPZ TRIPO_IN_MPFB_NPZ TRIPO_BASECOLOR WARP_NPZ BASE_SKIN OUT_PNG
 """
@@ -53,7 +53,7 @@ def main():
     pos, have = tx['pos'], tx['have']
     m = np.load(tripo)
     tex = np.asarray(Image.open(basecolor).convert('RGB'), np.float32) / 255
-    steps = int(os.environ.get('BAKE_STEPS', 12))        # samples per triangle edge: a low-poly Tripo head needs more, or the bake turns to mosaic
+    steps = int(os.environ.get('BAKE_STEPS', 12))        # samples per triangle edge: a low-poly input head needs more, or the bake turns to mosaic
     g = [(i, j) for i in range(steps + 1) for j in range(steps + 1 - i)]
     Bc = np.array([[(steps - i - j) / steps, i / steps, j / steps] for i, j in g], np.float32)
     P = np.einsum('gk,tkd->tgd', Bc, m['co'][m['tris']].astype(np.float32)).reshape(-1, 3)
@@ -64,7 +64,7 @@ def main():
     q = pos[ys, xs]
     w = np.load(warp)
     chin = float(w['z_hi']) + 0.015
-    above = q[:, 2] > chin - 0.14                                     # nothing below the collar takes a Tripo colour
+    above = q[:, 2] > chin - 0.14                                     # nothing below the collar takes an input colour
     dist = np.full(len(q), np.inf, np.float32)
     col = np.zeros((len(q), 3), np.float32)
     dist[above], j = tree.query(q[above], workers=-1)
@@ -82,17 +82,22 @@ def main():
 
     mx, mn = col.max(1), col.min(1)
     sat = (mx - mn) / (mx + 1e-6)
-    shirt = (sat < 0.12) & (mx > 0.45) & (os.environ.get('SHIRT', '1') == '1')   # SHIRT=0: pale highlights of a fair face stay Tripo's
+    shirt = (sat < 0.12) & (mx > 0.45) & (os.environ.get('SHIRT', '1') == '1')   # SHIRT=0: pale highlights of a fair face stay the input's
     near = np.clip((0.008 - dist) / 0.004, 0, 1)                      # full within 4 mm, none past 8 mm
-    # NECK_REACH (m): below the chin MPFB's neck is not fitted to Tripo's and lies further off; with the 8 mm reach
-    # it turned to the MPFB skin along a sharp line under the jaw. There the nearest Tripo point is still the neck: reach further
-    NR = float(os.environ.get('NECK_REACH', 0))
+    # NECK_REACH (m): below the chin MPFB's neck is not fitted to the input's and lies further off; with the 8 mm reach
+    # it turned to the MPFB skin along a sharp line under the jaw. There the nearest input point is still the neck: reach further
+    # Under the chin the head's UV island meets the body's at the neck: with the 8 mm reach the head's side took the input's colour
+    # and the body's side the base skin, a line across the neck. There the reach is NECK_REACH (default 4 cm), and the input's
+    # colour fades out by height alone, ending 1 cm above the input neck's cut (its dark rim left ticks along the line)
+    NR = float(os.environ.get('NECK_REACH', 0.04))
     if NR > 0:
-        under = q[:, 2] < chin
+        under = (q[:, 2] < chin) & (mx >= 0.3)   # not where it picks dark painted hair (a nape painted with hair turned black)
         near = np.where(under, np.clip((NR - dist) / (0.3 * NR), 0, 1), near)
-    zramp = np.clip((q[:, 2] - (chin - 0.11)) / 0.03, 0, 1)          # neck fades out towards the collar
+    z_cut = float(m['co'][:, 2].min())
+    z_low = max(chin - 0.11, z_cut + 0.01)
+    zramp = np.clip((q[:, 2] - z_low) / float(os.environ.get('NECK_FADE', 0.04)), 0, 1)   # neck fades out towards the collar
     wt = near * zramp * (~shirt)
-    # the scalp sits inside Tripo's hair shell: take the hair colour from further away (painted-on hair)
+    # the scalp sits inside the input's hair shell: take the hair colour from further away (painted-on hair)
     # only above the eyes or behind the ears (nape): the shadow under the jaw is dark too
     hair = (mx < 0.3) & (dist < 0.03) & ((q[:, 2] > chin + 0.075) | ((q[:, 1] > -0.03) & (q[:, 2] > chin - 0.02)))
     wt = np.maximum(wt, hair.astype(np.float32))
@@ -100,10 +105,26 @@ def main():
     base = np.asarray(Image.open(base_skin).convert('RGB').resize(have.shape[::-1]), np.float32) / 255
     bcol = base[ys, xs]
     # recolour the MPFB skin: per-channel gain from texels on the neck/jaw that are clearly skin
-    ref = (wt > 0.9) & (q[:, 2] < chin) & (sat > 0.15)
+    ref = (near > 0.9) & (q[:, 2] < chin) & (q[:, 2] > z_low) & (sat > 0.15) & ~hair   # by nearness and height, not the faded weight (a short input neck left none)
     gain = np.median(col[ref], 0) / np.median(bcol[ref], 0)
     print('neck texels', int(ref.sum()), 'gain', gain.round(3))
 
+    # round the neck (NECK_TONE, default on): the base skin under the input's neck had its own bright highlights (white patches at
+    # the neck's foot, read as bulges) and another tone, a step and a line across the neck. There it keeps only the base skin's fine
+    # detail (its lightness against a local blur, within +-10 %) on the input neck's colour, fading back to the base skin from
+    # NECK_TONE_FULL to NECK_TONE_END metres under the chin.
+    if os.environ.get('NECK_TONE', '1') != '0':
+        neck_c = np.median(col[ref], 0)
+        Lb = base.mean(2)
+        detail = np.clip(Lb / np.maximum(gaussian_filter(Lb, 12), 1e-3), 0.9, 1.1)
+        z_full, z_end = chin - float(os.environ.get('NECK_TONE_FULL', 0.20)), chin - float(os.environ.get('NECK_TONE_END', 0.30))
+        zn = np.zeros(have.shape, np.float32)
+        zn[ys, xs] = np.clip((q[:, 2] - z_end) / (z_full - z_end), 0, 1)
+        zn = gaussian_filter(zn, 6)
+        toned = neck_c[None, None, :] * detail[..., None]
+        base_g = np.clip(base * gain, 0, 1)
+        base = (toned * zn[..., None] + base_g * (1 - zn[..., None])) / np.maximum(gain, 1e-6)   # divided back: gain is applied below
+        print('NECK_TONE neck colour', (neck_c * 255).round().tolist(), 'texels toned', int((zn > 0.5).sum()))
     W = np.zeros(have.shape, np.float32)
     W[ys, xs] = wt
     # soft seam in UV space, normalised inside the islands: a plain blur took in the zeros outside each island, so every island's

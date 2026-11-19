@@ -1,4 +1,4 @@
-"""Slim the lower face of a level Tripo head: each vertex in front of the ears moves toward the midline by s(z) (slim_target.py,
+"""Slim the lower face of a level input head: each vertex in front of the ears moves toward the midline by s(z) (slim_target.py,
 both sides' mean so the face stays symmetric), scaled by how far out it is (0 inside INNER of the half-width: nose, mouth and
 eyes untouched) and by depth (full in front of the jaw angle, 0 at the ear). UVs and texture unchanged.
 blender -b -P slim_apply.py -- HEAD.glb SLIM.npz OUT.glb"""

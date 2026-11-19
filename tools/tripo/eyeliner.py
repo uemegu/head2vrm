@@ -1,7 +1,7 @@
-"""A clean eyeliner drawn along the approved upper lid line, instead of keeping what Tripo painted there.   any face
+"""A clean eyeliner drawn along the approved upper lid line, instead of keeping what the input texture shows there.   any face
 python eyeliner.py OUT_DIR SKIN_IN SKIN_OUT        (after lash_erase.py with BAND_LO=0, so the painted roots are gone)
 
-Why: the band of Tripo's painting kept along the margin (lash_erase's BAND_LO) held the painted lashes' roots,
+Why: the band of the painted texture kept along the margin (lash_erase's BAND_LO) held the painted lashes' roots,
 and its top was cut at a height interpolated from a dozen margin vertices: a ragged brown strip. With the line's shape
 known, a liner drawn programmatically is cleaner than one patched to match the original painting.
 How: the margins were fitted to the approved lines (lidfit/check_lines.txt) as seen from the lid-fit camera (lidfit/warp/v0_cam.json).
@@ -9,9 +9,9 @@ Each skin texel near an upper lid (3D: within REACH above the eyeball's centre b
 camera; its distance above the upper line, in mm at the eye, sets the liner's cover: full below the line (the lid's under-edge
 seen from the front) and up to the width w(s), fading over SOFT. w(s) runs from W_IN at the inner corner to W_OUT at the outer
 one (s = 0..1 along the line, smoothstep), tapering to nothing over the last TAPER of either end.
-PROFILE=1 (default; one line did not read as a double lid): two bands from Tripo's measured order, the rim (RIM_RGB, to RIM_IN..RIM_OUT mm)
+PROFILE=1 (default; one line did not read as a double lid): two bands from the input's measured order, the rim (RIM_RGB, to RIM_IN..RIM_OUT mm)
 then the fold line (LINE_RGB, LN_IN..LN_OUT mm more, crisp top CRISP). PROFILE=0: one line W_IN..W_OUT.
-Colour: LINER_RGB (sRGB; default the darkest of Tripo's lash line measured on one test head: 60,40,36), opacity ALPHA.
+Colour: LINER_RGB (sRGB; default the darkest of the painted lash line measured on one test head: 60,40,36), opacity ALPHA.
 """
 import json
 import os
@@ -78,7 +78,7 @@ for sgn in (1, -1):
     ss = s * s * (3 - 2 * s)
     ends = np.clip(s / TAPER, 0, 1) ** 0.7 * np.clip((1 - s) / TAPER, 0, 1) ** 0.7
     if PROFILE:
-        # Tripo's own order above the eyeball's edge (medians over the eye's width, on one test head): a grey-brown rim to ~0.5 mm, then a darker
+        # the input's own order above the eyeball's edge (medians over the eye's width, on one test head): a grey-brown rim to ~0.5 mm, then a darker
         # line to ~1.0 mm (what reads as the double lid's fold), then the lashes. Drawn as two bands with these widths
         bt = (RIM_IN + (RIM_OUT - RIM_IN) * ss) * ends                  # the rim band's top
         lt = bt + (LN_IN + (LN_OUT - LN_IN) * ss) * ends                # the line's top

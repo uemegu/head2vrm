@@ -1,5 +1,5 @@
-"""Put a Tripo hair part (hairgraft/split.py) on the fitted MPFB character: the same similarity transform that
-tripo_fit.py moved the Tripo head with (warp.npz scale/rot/trans), then skinned 100% to the head bone.
+"""Put an input hair part (hairgraft/split.py) on the fitted MPFB character: the same similarity transform that
+tripo_fit.py moved the input head with (warp.npz scale/rot/trans), then skinned 100% to the head bone.
 In front of the ears the hair is lifted off the skin where it touches or sinks into it.
 The MPFB scalp (above the brows or behind the ears) is the base mesh's own skull and pokes through the hair in places: a
 scalp vertex with no hair along its normal but hair within 12 mm behind it is pushed 4 mm under the hair

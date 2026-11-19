@@ -1,4 +1,4 @@
-"""Paint the skin under the hair (scalp_mask.py) the hair's root colour, so the gaps in the Tripo hair show dark, not skin.
+"""Paint the skin under the hair (scalp_mask.py) the hair's root colour, so the gaps in the input hair show dark, not skin.
 python scalp_paint.py OUT_DIR SKIN_IN.png SKIN_OUT.png   (OUT_DIR: scalp_mask.npy, texels.npz)
 ROOT_RGB sRGB (default 34,27,23: a little above the hair texture's median 20,18,17), FADE texels of soft edge at 4k."""
 import os, sys, shutil

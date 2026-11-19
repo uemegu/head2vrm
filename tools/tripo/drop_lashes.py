@@ -1,4 +1,4 @@
-"""Remove the 3D eyelashes object (the painted lashes of the Tripo skin are kept instead).   blender -b IN.blend -P drop_lashes.py -- OUT.blend"""
+"""Remove the 3D eyelashes object (the lashes painted on the skin texture are kept instead).   blender -b IN.blend -P drop_lashes.py -- OUT.blend"""
 import sys
 import bpy
 out = sys.argv[sys.argv.index('--') + 1]

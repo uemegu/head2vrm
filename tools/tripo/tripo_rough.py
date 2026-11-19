@@ -1,4 +1,4 @@
-"""Roughness map (glTF: G channel) for the Tripo skin: painted-on hair matte, lips glossy, skin in between.
+"""Roughness map (glTF: G channel) for the baked input skin: painted-on hair matte, lips glossy, skin in between.
 Without a map the viewer puts its pore roughness (0.3-0.75) and skin sheen on the painted hair too.
 
 python tripo_rough.py TEXELS_NPZ SKIN_PNG WARP_NPZ OUT_PNG [size]

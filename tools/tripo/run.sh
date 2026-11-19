@@ -1,6 +1,6 @@
 #!/bin/bash
-# Tripo head GLB -> the MPFB base head fitted onto its surface, with the eye and mouth openings on Tripo's own painted lines, and
-# Tripo's colours baked into the base's skin texture.   run.sh HEAD_GLB OUT_DIR   (called by make_face.sh; cwd: tools/tripo)
+# Input head GLB -> the MPFB base head fitted onto its surface, with the eye and mouth openings on the input's own painted lines, and
+# the input's colours baked into the base's skin texture.   run.sh HEAD_GLB OUT_DIR   (called by make_face.sh; cwd: tools/tripo)
 # Two stops for a person (exit 3): the lid lines (lidfit/check.jpg) and the mouth lines (mouthfit/check.jpg). Each is approved by
 # writing the md5 of its check_lines.txt into `approved` next to it; changed lines ask again.
 set -e -o pipefail
@@ -14,15 +14,15 @@ GLB=$1; O=$(mkdir -p "$2" && cd "$2" && pwd)
 q() { grep -E "rror|Traceback" || true; }
 export KEEP_LEVEL=1 SEAM_TGT=1 SEAM_CORNERS=1 TEX_EXACT=1 SHIRT=0
 uvmesh() { $B --background "$O/warped_e0.blend" --python $M/export_uv.py -- "$O/uvmesh.npz" 2>&1 | q; }
-echo "== 1/7 Tripo の頭を読み、特徴点を取る"
+echo "== 1/7 入力の頭を読み、特徴点を取る"
 $B --background --python tripo_export.py -- "$GLB" "$O" 2>&1 | grep -E "EXPORTED|rror"
 $PY tripo_lm.py "$O" 2>&1 | grep -E "hits|agree|no face"
 $B --background $M/$BASE/base_arkit.blend --python $M/export_uv.py -- "$O/base_uvmesh.npz" 2>&1 | q
-echo "== 2/7 素体を Tripo の表面へ合わせる"
+echo "== 2/7 素体を入力の頭の表面へ合わせる"
 $PY tripo_fit.py $M/$BASE/corr.npz "$O" "$O/warp.npz" $FIT_ARGS 2>&1 | grep -E "dropped|outside|iter 5|eyeball|after_mm|gap_mm|max_disp|rror|Traceback"
 MOUTH_CLOSE=0.08 $B --background $M/$BASE/base_arkit.blend --python $M/apply.py -- "$O/warp.npz" "$O/warped_e0.blend" 2>&1 | q
 uvmesh
-echo "== 3/7 まぶたの縁と唇の合わせ目を、Tripo が描いた線へ"
+echo "== 3/7 まぶたの縁と唇の合わせ目を、テクスチャに描かれた線へ"
 $PY seam_fit.py "$O/view_+0.png" "$O" $M/$BASE/corr.npz 2>&1 | grep -E "^SEAM|rror|Traceback"
 $B --background "$O/warped_e0.blend" --python seam_apply.py -- "$O/seam.npz" "$O/warped_e0.blend" 2>&1 | grep -E "^SEAM|rror|Traceback"
 uvmesh

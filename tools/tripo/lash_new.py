@@ -89,7 +89,7 @@ for sgn in (1, -1):
                 d0 = unit(FWD * 0.4 - UPV * 0.8 + OUT * (0.05 + LO_OUT * u) + rng.normal(0, 0.14, 3))
                 curl = -UPV * 0.05 + OUT * 0.05
             strands.append([root, L, d0, curl, np.zeros(3)])
-        # clumps (evenly spaced single lashes looked wrong): Tripo's lashes stand in groups of 2-4 whose tips meet. Neighbours are grouped and
+        # clumps (evenly spaced single lashes looked wrong): the painted lashes stand in groups of 2-4 whose tips meet. Neighbours are grouped and
         # each one's tip is drawn towards the group's mean tip by CLUMP (the pull grows with the square of the length along it)
         k_ = UP_CLUMP if name == 'up' else LO_CLUMP
         if k_ > 0:

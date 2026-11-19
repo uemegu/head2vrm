@@ -1,5 +1,5 @@
 #!/bin/bash
-# Tripo の頭の GLB → MakeHuman の素体の頭をその形と色に合わせた VRM（全身の素体つき）。目・まぶた・口・舌は動く
+# 入力の頭の GLB → MakeHuman の素体の頭をその形と色に合わせた VRM（全身の素体つき）。目・まぶた・口・舌は動く
 # （ARKit の 52 キー、VRM の表情プリセット、視線）。GLB に髪の部品があれば、頭に載せて揺れるようにする（HAIR_PART）。
 # HEAD_ONLY=1 で、首で切った頭だけにする（体・服・靴を外す）。
 #
@@ -9,8 +9,8 @@
 # 途中で 2 回、人の確認で止まる（exit 3）：まぶたの線と口の線。表示される画像を見て、正しければ表示されたコマンドで承認し、
 # もう一度同じコマンドを実行する。
 #
-# 出力：作業フォルダ/<NAME>.vrm
-#       作業フォルダ/out/render_e0/cmp_*.jpg（Tripo と並べた比較）
+# 出力：作業フォルダ/<NAME>.vrm、<NAME>-closedlid.png/.json（閉じたまぶたの肌の補正。付属のビューア用）
+#       作業フォルダ/out/render_e0/cmp_*.jpg（元のモデルと並べた比較）
 set -e -o pipefail
 F=$(cd "$(dirname "$0")" && pwd); T=$F/tools/tripo; M=$F/tools/mpfb; PL=$T/pipeline
 [ -n "$1" ] || { sed -n 2,13p "$0"; exit 2; }
@@ -27,18 +27,20 @@ cd "$T"
 
 if [ -z "$SKIP_RUN" ]; then
   echo "== 準備：顔と髪の部品を見分け、顔を 1 つのメッシュに、頭の傾きを水平に"
-  mkdir -p $P/raw; rm -f $P/raw/hair.glb $P/raw/hair_clean.glb $P/src/hair.glb
+  mkdir -p $P/raw; rm -f $P/raw/hair.glb $P/src/hair.glb
   # 顔の部品：PREP_PARTS を書いたらその最初の部品、書かなければ肌の色がいちばん多い部品（hair/parts.py）
-  HEAD_PART=$( [ -n "$PREP_PARTS" ] && echo "${PREP_PARTS%%:*}" || echo auto ) HAIR_PART=${HAIR_PART:-auto} \
+  HEAD_PART=$( [ -n "$PREP_PARTS" ] && echo "${PREP_PARTS%%:*}" || echo auto ) HAIR_PART=$( [ -n "$HAIR_GLB" ] && echo none || echo ${HAIR_PART:-auto} ) \
     $B -b -P $T/hair/parts.py -- "$HEAD_GLB" $P/raw 2>&1 | q "^PARTS|rror|Traceback"
-  RGB() { $PY -c "import json; v=json.load(open('$P/raw/parts.json'))['$1']; print(','.join('%g' % c for c in v) if v else '')"; }
+  if [ -n "$HAIR_GLB" ]; then   # 髪は別の GLB から（同じモデルの髪つき版。大きさと位置を顔の GLB に合わせてから載せる）
+    mkdir -p $P/raw_hair
+    HEAD_PART=auto HAIR_PART=${HAIR_PART:-auto} $B -b -P $T/hair/parts.py -- "$HAIR_GLB" $P/raw_hair 2>&1 | q "^PARTS|rror|Traceback"
+    $B -b -P $T/hair/hair_align.py -- "$HEAD_GLB" $P/raw/parts.json "$HAIR_GLB" $P/raw_hair/parts.json $P/raw/hair.glb 2>&1 | q "^HAIR_ALIGN|rror|Traceback"
+    [ -f $P/raw/hair.glb ] || { echo "HAIR_GLB の髪を顔に合わせられませんでした（上のログ）"; exit 1; }
+    $PY -c "import json; a=json.load(open('$P/raw/parts.json')); b=json.load(open('$P/raw_hair/parts.json')); a['hair_rgb'] = b['hair_rgb']; json.dump(a, open('$P/raw/parts.json', 'w'), indent=1)"
+  fi
   [ -n "$PREP_PARTS" ] || PREP_PARTS="$($PY -c "import json; print(json.load(open('$P/raw/parts.json'))['head'])"):0,0"
   $B -b -P $PL/prep.py -- "$HEAD_GLB" $P/raw $PREP_PARTS 2>&1 | q "^PREP|rror"
-  if [ -f $P/raw/hair.glb ]; then   # 髪に混ざった肌（こめかみ・耳）の面を外し、残りの肌色を髪で埋める
-    SKIN_STATS=$(RGB skin_stats) HAIR_STATS=$(RGB hair_stats) $B -b --python $T/hair/hair_cut.py -- $P/raw/hair.glb $P/raw/hair_cut.glb 2>&1 | q "^HAIR_CUT|rror|Traceback"
-    SKIN_STATS=$(RGB skin_stats) HAIR_STATS=$(RGB hair_stats) $PY -I $T/hair/hair_skin_out.py $P/raw/hair_cut.glb $P/raw/hair_clean.glb $P/raw/hair_check.jpg | q "^HAIR_SKIN|rror|Traceback"
-  fi
-  ./level_head.sh $P/raw/head.glb $P/src $( [ -f $P/raw/hair_clean.glb ] && echo $P/raw/hair_clean.glb )
+  ./level_head.sh $P/raw/head.glb $P/src $( [ -f $P/raw/hair.glb ] && echo $P/raw/hair.glb )
   HEAD=$P/src/head.glb
   if [ "${SLIM_GAIN:-0}" != 0 ]; then   # 輪郭の下半分を肖像画の輪郭へ（PORTRAIT が要る）
     : "${PORTRAIT:?SLIM_GAIN を使うときは PORTRAIT（元の肖像画）が要ります}"
@@ -83,8 +85,8 @@ $B --background "$O/face_only.blend" --python $T/caruncle.py -- "$O" "$O/face_on
 # 目を閉じるキーで眉の毛を動かさない（眉が低い顔で、閉じたまぶたに眉の毛が筋になって伸びた。BLINK_BROW=0 で外す）
 [ "${BLINK_BROW:-1}" = 0 ] || $B --background "$O/face_only.blend" --python $T/blink_brow.py -- "$O/face_only.blend" 2>&1 | q "^BLINK_BROW|rror|Traceback"
 FINAL=$O/face_only.blend
-if [ -f "$P/src/hair.glb" ]; then   # Tripo の髪：頭と同じ動かし方で載せ、頭の骨に付け、揺れる骨を入れ、髪の下の頭皮を根元の色に塗る
-  echo "== 髪：Tripo の髪の部品を載せる"
+if [ -f "$P/src/hair.glb" ]; then   # 入力の髪：頭と同じ動かし方で載せ、頭の骨に付け、揺れる骨を入れ、髪の下の頭皮を根元の色に塗る
+  echo "== 髪：髪の部品を載せる"
   $B --background "$FINAL" --python $T/hair/hair_graft.py -- "$P/src/hair.glb" "$O/warp.npz" "$O/hair.blend" 2>&1 | q "^HAIR|rror|Traceback"
   FINAL=$O/hair.blend
   if [ "${HAIR_SPRING:-12}" != 0 ]; then
@@ -103,6 +105,9 @@ if [ -n "$HEAD_ONLY" ]; then   # 首で切った頭だけ（体・服・靴を�
 fi
 NO_HAIR=1 LOOKAT_EXPR=1 VRM_NAME=${VRM_NAME:-$NAME} VRM_AUTHOR=${VRM_AUTHOR:-unknown} ROUGHNESS=$O/roughness_4k.png \
   $B --background "$FINAL" --python export_vrm.py -- "$P/$NAME.vrm" 2>&1 | q "^EXPORT|^LOOKAT|rror|Traceback"
+# 閉じたまぶたの肌の補正（描かれたまつ毛の先を消した肌。付属のビューアが目の閉じ具合に合わせて混ぜる。VRM はこれなしで完結）
+$B --background "$O/face_only.blend" --python $PL/closed_lid_vis.py -- "$O/closedlid" 2>&1 | q "rror|Traceback"
+.venv/bin/python $PL/closed_lid_patch.py "$O" "$O/skin_nolash.png" "$P" $NAME-closedlid 2>&1 | q "^CLOSED_PATCH|rror"
 )
 ls -la "$P/$NAME.vrm"
 echo "できました：$P/$NAME.vrm（確認は viewer/index.html。比較画像は $O/render_e0/cmp_*.jpg）"

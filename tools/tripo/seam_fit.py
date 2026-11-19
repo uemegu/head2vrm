@@ -50,9 +50,9 @@ for k, i in enumerate(ids):
             pts[i] = p
 good = ~np.isnan(pts[:, 0])
 to_base = RBFInterpolator(px[good], pts[good][:, [0, 2]], kernel='thin_plate_spline', smoothing=1e-5, neighbors=120)
-# SEAM_TGT=1: the lid and lip rings aim at Tripo's own 3D landmarks. Without it, a landmark within 8 mm of the warped mesh
+# SEAM_TGT=1: the lid and lip rings aim at the input head's own 3D landmarks. Without it, a landmark within 8 mm of the warped mesh
 # is replaced by the mesh's own point, so the margins stay where the fit left them (on one test head: lip middle 2 mm high, corners 2-3 mm
-# low, a flat mouth instead of Tripo's smile).
+# low, a flat mouth instead of the input's smile).
 if os.environ.get('SEAM_TGT'):
     pts = tgt.copy()
 
@@ -133,7 +133,7 @@ for name, uvb, rings, reach in (
     if upper_t[0, 0] > upper_t[-1, 0]:
         upper_t, lower_t = upper_t[::-1], lower_t[::-1]
     if name != 'lips' and os.environ.get('SEAM_EYE_NPZ'):
-        # the lid margins' targets given directly (an external fitting loop: Tripo's painted opening, measured on a close render and
+        # the lid margins' targets given directly (an external fitting loop: the input's painted opening, measured on a close render and
         # corrected by what the mesh shows): polylines in (x, z), ascending x, keyed by the eye's side
         E_ = np.load(os.environ['SEAM_EYE_NPZ'])
         side_ = 'pos' if upper_t[:, 0].mean() > 0 else 'neg'
@@ -146,7 +146,7 @@ for name, uvb, rings, reach in (
                 upper_t = new_
             else:
                 lower_t = new_
-    if name != 'lips' and os.environ.get('EYE_OPEN'):         # the upper lid's arch above the corners' line, raised (a Tripo eye can be smaller than its portrait's)
+    if name != 'lips' and os.environ.get('EYE_OPEN'):         # the upper lid's arch above the corners' line, raised (the input head's eye can be smaller than its portrait's)
         chord = np.interp(upper_t[:, 0], upper_t[[0, -1], 0], upper_t[[0, -1], 2])
         upper_t[:, 2] = chord + (upper_t[:, 2] - chord) * float(os.environ['EYE_OPEN'])
         chord = np.interp(lower_t[:, 0], lower_t[[0, -1], 0], lower_t[[0, -1], 2])
@@ -170,8 +170,8 @@ for name, uvb, rings, reach in (
     if name == 'lips':
         # the mouth's corners stay on the mesh and the painted seam comes to them (seam.npz's pins, read by face_paint.py): moving a corner to the
         # landmarks' uneven height folded the skin beside it
-        # SEAM_CORNERS=1: the corners go to the landmarks too (a plain Tripo head: its own landmarks, no portrait's uneven
-        # ones). On one test head the fit left the mesh corners ~2 mm below Tripo's, and pinning the seam's ends there flattened its smile.
+        # SEAM_CORNERS=1: the corners go to the landmarks too (a plain input head: its own landmarks, no portrait's uneven
+        # ones). On one test head the fit left the mesh corners ~2 mm below the input's, and pinning the seam's ends there flattened its smile.
         for ring, path in ((upper_t, up), (lower_t, lo)):
             if os.environ.get('SEAM_CORNERS'):
                 break

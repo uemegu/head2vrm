@@ -1,6 +1,6 @@
-"""A Tripo head GLB -> OUT_DIR/head.glb, the whole head turned level (level_head.sh measures the angle).
+"""An input head GLB -> OUT_DIR/head.glb, the whole head turned level (level_head.sh measures the angle).
 blender --background --python level_prep.py -- GLB OUT_DIR        env LEVEL (degrees), LEVEL_C (x,z of the turn's centre)
-A leaning reference bakes its lean into Tripo's head. The whole head turns about the point between the eyes, in the face's
+A leaning reference bakes its lean into the input head. The whole head turns about the point between the eyes, in the face's
 plane (x-z); the UV goes with it. The largest mesh part is the head; other parts (hair, scraps) are left out."""
 import math, os, sys
 import bpy

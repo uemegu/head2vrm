@@ -1,11 +1,11 @@
-"""The nose onto the Tripo head's own nose (NOSE_FIT in run.sh).
+"""The nose onto the input head's own nose (NOSE_FIT in run.sh).
 python nose_fit.py OUT_DIR       -> OUT_DIR/nose_delta.npz (seam_apply.py format)
 
 Why: on one test head the nose looked bulbous and the nostrils' dark showed on its surface. After tripo_fit.py the tip stood
-2-3 mm short of Tripo's and its lobule 4-5 mm wider each side at the nostrils' height (seen in cross-sections),
-so the tip read round; and as the skin takes each texel's colour from the closest Tripo point, the swollen alae took the dark of
-Tripo's nostrils and alar creases onto their outer surface. Here every outward-facing vertex near the nose (within R mm of the
-tip, MediaPipe 1 through corr.npz; above the upper lip) is pulled to the closest point of the Tripo surface where that surface faces
+2-3 mm short of the input's and its lobule 4-5 mm wider each side at the nostrils' height (seen in cross-sections),
+so the tip read round; and as the skin takes each texel's colour from the closest input point, the swollen alae took the dark of
+the input's nostrils and alar creases onto their outer surface. Here every outward-facing vertex near the nose (within R mm of the
+tip, MediaPipe 1 through corr.npz; above the upper lip) is pulled to the closest point of the input surface where that surface faces
 the same way (normals within ANGLE degrees, the point within REACH mm), its pull fading out over the last FADE mm of the region;
 the nostrils' insides follow by ARAP (cotangent weights). ROUNDS rounds re-find the closest points from where the surface now is.
 """
@@ -40,7 +40,7 @@ def vnormals(P):
     return n / np.maximum(np.linalg.norm(n, axis=1, keepdims=True), 1e-12)
 
 
-# the Tripo surface: exact closest points (Ericson) among the triangles nearest by centroid
+# the input surface: exact closest points (Ericson) among the triangles nearest by centroid
 A_, B_, C_ = C[F[:, 0]], C[F[:, 1]], C[F[:, 2]]
 FN = np.cross(B_ - A_, C_ - A_); FN /= np.maximum(np.linalg.norm(FN, axis=1, keepdims=True), 1e-12)
 ctree = cKDTree((A_ + B_ + C_) / 3)
@@ -78,7 +78,7 @@ region = in_tri & (dist_tip < R) & (V0[:, 2] > lip_z + E('NOSE_LIP', 4) / 1000)
 fade = np.clip((R - dist_tip) / FADE, 0, 1) ** 2
 fade *= np.clip((V0[:, 2] - lip_z - E('NOSE_LIP', 4) / 1000) / FADE, 0, 1) ** 2   # also over the region's lower edge (a hard edge left a crease above the lip)
 print('NOSE region %d vertices (R %.0f mm)' % (region.sum(), R * 1000))
-# the nostrils are not pulled: Tripo's are shallow painted dents, and pulling the base's nostril rims onto their floor lifted
+# the nostrils are not pulled: the input's are shallow painted dents, and pulling the base's nostril rims onto their floor lifted
 # them 2.8 mm into the nose (a lump in the left nostril). Faces turned down (normal z under -NOSE_DOWN) beside the columella
 # (|x - tip x| over NOSE_COL mm) only follow
 n0 = vnormals(V0)
@@ -137,7 +137,7 @@ def report(P, tag):
     ok = (dd < REACH) & ((n[free] * FN[f]).sum(1) > np.cos(np.radians(ANGLE)))
     sd = dd * np.sign(((P[free] - q) * n[free]).sum(1)) * 1000
     m = ok & (fade[free] > 0.5)
-    print('NOSE %s: matched %d of %d, off the Tripo surface mm (inner region) p5 %.2f median %.2f p95 %.2f, |d|>1mm %d'
+    print('NOSE %s: matched %d of %d, off the input surface mm (inner region) p5 %.2f median %.2f p95 %.2f, |d|>1mm %d'
           % (tag, ok.sum(), len(free), np.percentile(sd[m], 5), np.median(sd[m]), np.percentile(sd[m], 95), int((np.abs(sd[m]) > 1).sum())))
     return q, ok
 
@@ -146,7 +146,7 @@ P = V0.copy()
 for rnd in range(ROUNDS):
     q, ok = report(P, 'round %d' % rnd)
     # the nostrils: pulled softly (NOSTRIL_W) and no further than NOSTRIL_CAP mm from where they started, so the rims rise to the
-    # alae's height (left free, the base's rims hung 1-2 mm under Tripo's as two stubs) but the insides do not climb into Tripo's dents
+    # alae's height (left free, the base's rims hung 1-2 mm under the input's as two stubs) but the insides do not climb into the input's dents
     nf = nostril[free]
     wv = W_H * fade[free] * ok * np.where(nf, E('NOSTRIL_W', 0.5), 1.0)
     T = np.where(ok[:, None], q, P[free])

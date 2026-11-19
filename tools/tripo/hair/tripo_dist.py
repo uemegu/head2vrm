@@ -1,4 +1,4 @@
-"""Distance from each head texel (1/4 grid) to Tripo's surface fitted into MPFB -> OUT/tripo_dist_q.npy (scalp_mask.py reads it)."""
+"""Distance from each head texel (1/4 grid) to the input head's surface fitted into MPFB -> OUT/tripo_dist_q.npy (scalp_mask.py reads it)."""
 import sys
 import numpy as np
 from scipy.spatial import cKDTree

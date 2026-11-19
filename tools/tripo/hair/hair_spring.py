@@ -1,4 +1,4 @@
-"""Make the grafted Tripo hair (hair_graft.py) sway: bone chains under the head bone, the hair re-skinned to them,
+"""Make the grafted input hair (hair_graft.py) sway: bone chains under the head bone, the hair re-skinned to them,
 and VRM 1.0 spring bones with head / neck colliders.
 
 blender --background textured_hair.blend --python hair_spring.py -- OUT_BLEND [MODE]

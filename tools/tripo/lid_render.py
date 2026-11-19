@@ -1,10 +1,10 @@
 """Close orthographic front renders of both eyes, unlit (the textures' own colours), all from one camera:
-  <out>_tripo.png  Tripo's head (its mesh in the MPFB frame, tripo_in_mpfb.npz + tripo_basecolor.png)
+  <out>_tripo.png  the input head (its mesh in the MPFB frame, tripo_in_mpfb.npz + tripo_basecolor.png)
   <out>_mpfb.png   the fitted MPFB head (Human, eyeballs, lashes)
   <out>_mask.png   the same with the eyeballs pure magenta and no lashes: the visible opening
 blender -b X.blend -P eye_render.py -- OUT_PREFIX TRIPO_NPZ TRIPO_PNG   (X.blend: warped_e0/textured; its shape keys are set to 0)
-Camera: centred between the eyeballs, 2 px per 0.05 mm (RES px over WIDTH m); VIEW=tripo: the viewer's Tripo view instead.
-MASK_ONLY=1 TRIPO_TOO=1: the Tripo head and the mask from one camera; INNER=1: the lids' inner faces cyan in the mask. <out>_cam.json: the camera."""
+Camera: centred between the eyeballs, 2 px per 0.05 mm (RES px over WIDTH m); VIEW=tripo: the viewer's input-model view instead.
+MASK_ONLY=1 TRIPO_TOO=1: the input head and the mask from one camera; INNER=1: the lids' inner faces cyan in the mask. <out>_cam.json: the camera."""
 import bpy, sys, mathutils, numpy as np
 out, tnpz, tpng = sys.argv[sys.argv.index('--') + 1:]
 import os
@@ -37,7 +37,7 @@ dg = bpy.context.evaluated_depsgraph_get()
 eye = sc.objects['Human.high-poly']
 E = np.array([eye.matrix_world @ v.co for v in eye.evaluated_get(dg).data.vertices])
 c = np.array([float(v) for v in os.environ["CAM_CENTRE"].split(",")]) if os.environ.get("CAM_CENTRE") else E.mean(0)
-# Tripo's own head
+# the input's own head
 d = np.load(tnpz)
 me = bpy.data.meshes.new('tri'); me.from_pydata(d['co'].tolist(), [], d['tris'].tolist()); me.update()
 uvl = me.uv_layers.new()
@@ -52,7 +52,7 @@ sc.render.engine = 'BLENDER_EEVEE'; sc.view_settings.view_transform = 'Standard'
 sc.render.resolution_x, sc.render.resolution_y = RES_X, RES_Y
 w = bpy.data.worlds.new('w'); sc.world = w; w.color = (0.1, 0.1, 0.1)
 cam = bpy.data.objects.new('c', bpy.data.cameras.new('c')); sc.collection.objects.link(cam); sc.camera = cam
-VIEW = os.environ.get('VIEW')   # 'tripo': the viewer's "Tripo と同じ" camera (viewer.js VIEWS.tripo): 7.94 x the pupils' spacing from
+VIEW = os.environ.get('VIEW')   # 'tripo': the viewer's input-model view camera (viewer.js VIEWS.tripo): 7.94 x the pupils' spacing from
                                 # the irises' front, aimed 0.59 x that spacing below the eyes, raised 10.4 deg, 23.6 deg high
 if VIEW == 'tripo':
     k_, below, elev, fov = 7.94, 0.59, np.radians(float(os.environ.get('ELEV', 10.4))), np.radians(23.6)
@@ -78,7 +78,7 @@ def shot(name):
     sc.render.filepath = f'{out}_{name}.png'; bpy.ops.render.render(write_still=True)
 human = [o for o in sc.objects if o.type == 'MESH' and o.name in ('Human', 'Human.high-poly', 'Human.eyelashes01')]
 if os.environ.get('MASK_ONLY'):      # just the opening: skin black, eyeballs magenta, no lashes
-    if os.environ.get('TRIPO_TOO'):  # and first the Tripo head alone, from the same camera
+    if os.environ.get('TRIPO_TOO'):  # and first the input head alone, from the same camera
         for o in human: o.hide_render = True
         tri.hide_render = False; shot('tripo')
         for o in human: o.hide_render = False

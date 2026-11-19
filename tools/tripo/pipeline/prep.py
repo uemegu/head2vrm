@@ -1,4 +1,4 @@
-"""Part-split bald Tripo head (GLB) -> head.glb: one mesh, one 4096 atlas, every part's texture copied
+"""Part-split bald input head (GLB) -> head.glb: one mesh, one 4096 atlas, every part's texture copied
 pixel for pixel (no rescale; the face keeps its 2048 texels). Parts not listed are dropped.
 blender -b -P prep.py -- GLB OUT_DIR PART:X0,Y0 [PART:X0,Y0 ...]     (X0,Y0: the cell's corner in the atlas, 0..1, v up)
 """

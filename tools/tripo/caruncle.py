@@ -1,14 +1,14 @@
 """A caruncle in each inner corner: a small surface just in front of the eyeball, in the inner end of the opening, carrying the pink
-Tripo painted there (projected from the lid-fit camera).   any face, after run.sh with LID_FIT
+the input texture shows there (projected from the lid-fit camera).   any face, after run.sh with LID_FIT
 blender -b IN.blend -P caruncle.py -- OUT_DIR OUT.blend
 
-Why: Tripo paints the inner 2.5-3 mm of each opening pink (caruncle and plica) and the white begins ~3.5 mm from
+Why: the input texture can paint the inner 2.5-3 mm of each opening pink (caruncle and plica) and the white begins ~3.5 mm from
 the tip. With the opening to the tip (so the white does not shrink) the base mesh's eyeball showed white there; cutting the
-opening short at the white (CARUNCLE in lid_arap.py) made the eye look small. The pink belongs there, as in Tripo's corner.
-How: in the lid-fit camera image of Tripo (lidfit/warp/v0_tripo.png) the pixels inside the approved outline (lidfit/check_lines.txt)
+opening short at the white (CARUNCLE in lid_arap.py) made the eye look small. The pink belongs there, as in the input's corner.
+How: in the lid-fit camera image of the input head (lidfit/warp/v0_tripo.png) the pixels inside the approved outline (lidfit/check_lines.txt)
 within REACH mm of the inner tip are the caruncle's picture; their opacity is their pinkness (a* from A0, full A0+A1) fading out
 past FADE of REACH. A grid over them (STEP px) is lifted along the camera rays onto the eyeball (a sphere fitted to the eye mesh's
-back half) plus LIFT (1.4 mm: on the ball itself it hid behind the lids' margins), so from the fit camera it sits exactly where Tripo painted it. It rides the head bone like the eyeball.
+back half) plus LIFT (1.4 mm: on the ball itself it hid behind the lids' margins), so from the fit camera it sits exactly where the input texture shows it. It rides the head bone like the eyeball.
 """
 import json
 import os
@@ -95,7 +95,7 @@ for k in range(0, len(ln), 3):
     cxg, cyg = np.meshgrid(np.arange(tx0, tx1), np.arange(ty0, ty1))
     a_crop = np.clip((A[cyg, cxg] - A0) / A1, 0, 1) * np.clip((REACH - np.abs(cxg - tip) * mm_px) / FADE, 0, 1)
     a_crop *= (cyg >= np.interp(cxg, xx, up) - 1) & (cyg <= np.interp(cxg, xx, lo) + 1)
-    # soften its edge (a* falls off sharply where Tripo's white begins; the patch's own edge read as a cut line)
+    # soften its edge (a* falls off sharply where the input's white begins; the patch's own edge read as a cut line)
     pad = np.pad(a_crop, 2, mode='edge'); a_soft = sum(pad[i:i + a_crop.shape[0], j:j + a_crop.shape[1]] for i in range(5) for j in range(5)) / 25
     a_crop = np.minimum(a_crop, a_soft) * 0.5 + a_soft * 0.5
     tex = np.dstack([crop, a_crop])[::-1]                                      # bottom row first for Blender

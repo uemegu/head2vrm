@@ -1,8 +1,8 @@
-"""Keep the eyebrows still when the eyes close.
+"""Keep the eyebrows still, and the painted lashes unstretched, when the eyes close.
 
 blender --background FACE.blend --python blink_brow.py -- OUT.blend
 
-Why: the blink keys come from the MakeHuman base, whose upper lid region reaches 14 mm above the eye. A Tripo face
+Why: the blink keys come from the MakeHuman base, whose upper lid region reaches 14 mm above the eye. An input face
 with low brows has its brow hair there, so closing the eye pulled the brow's lower half 3-6 mm down and its painted hairs ran down
 the closed lid as streaks that looked like eyebrows.
 
@@ -11,6 +11,12 @@ skin round the eye, and BROW_ABOVE mm or more above the upper lid's edge) do not
 back evenly (linearly) over the skin between the brow's lower edge and the lid's edge, so the lid skin takes the stretch spread out
 (a 3 mm ramp under the brow gathered it into a crease line there). The lid's edge
 moves as before, so the eye still shuts.
+
+The painted lashes (LASH=1): the input texture may paint the upper lashes on the skin above the lid's edge. The blink keys move that edge furthest
+and the skin above it less, so the painted band was stretched down the closed lid into vertical streaks. In the blink keys
+(eyeBlink*, blink_l/r) each vertex of the band (from the lid's edge up LASH_MAX mm, under the brow) stays where the key puts it
+on the closed lid but no further from its lid edge vertex than when open; above it the motion goes back to the key's own (after the brow rule above) over LASH_RAMP mm, so the
+plain skin there takes the stretch. The open eye is unchanged (only the keys change).
 """
 import os
 import sys
@@ -21,8 +27,13 @@ import numpy as np
 out = sys.argv[sys.argv.index('--') + 1]
 E = lambda k, d: float(os.environ.get(k, d))
 BROW_DARK, BROW_ABOVE, RAMP, BIN = E('BROW_DARK', 0.7), E('BROW_ABOVE', 3) / 1000, E('RAMP', 3) / 1000, E('BIN', 1.5) / 1000
-BROW_BAND = E('BROW_BAND', 16) / 1000
-RAMP_FRAC = E('RAMP_FRAC', 0.5)   # how far above the lid's edge the brow is looked for (the painted scalp lies above)
+BROW_BAND = E('BROW_BAND', 16) / 1000   # how far above the lid's edge the brow is looked for (the painted scalp lies above)
+RAMP_FRAC = E('RAMP_FRAC', 0.5)
+LASH, LASH_MAX, LASH_RAMP = E('LASH', 1), E('LASH_MAX', 5) / 1000, E('LASH_RAMP', 2) / 1000
+LASH_SIDE = E('LASH_SIDE', 3) / 1000
+LASH_COL = E('LASH_COL', 2) / 1000
+LASH_BACK = E('LASH_BACK', 12) / 1000
+LASH_GAP = E('LASH_GAP', 8) / 1000
 
 o = bpy.data.objects['Human']; me = o.data; kb = me.shape_keys.key_blocks; n = len(me.vertices)
 img = next(nd.image for nd in me.materials[0].node_tree.nodes if nd.type == 'TEX_IMAGE' and nd.image)
@@ -94,6 +105,7 @@ def _read(f):
 
 
 scale = np.ones(n)
+follow = np.zeros(n); edge_of = np.arange(n)   # the painted lash band: how much each vertex follows its lid edge vertex, and which
 for side in (-1, 1):
     bk = [k for k in ('eyeBlinkLeft', 'eyeBlinkRight', 'blink_l', 'blink_r') if k in disp]
     dm = np.max([np.linalg.norm(disp[k], axis=1) for k in bk], 0) * (np.sign(base[:, 0]) == side)
@@ -123,11 +135,11 @@ for side in (-1, 1):
     over_eye = np.zeros(RES, bool); over_eye[np.clip(lx.min(), 0, RES - 1):np.clip(lx.max(), 0, RES - 1) + 1] = True
     brow_m = _largest(dark, over_eye)
     if not brow_m.any():
-        print('BLINK_BROW side %+d: no brow found above the lid' % side); continue
+        print('BLINK_BROW side %+d: no brow found above the lid' % side)
     cols = brow_m.any(0); z_b_px = np.where(cols, RES - 1 - np.argmax(brow_m[::-1], 0), -1)   # lowest brow pixel per column
     # smoothed along the brow (a running median over 2 mm): the mask's ragged lower edge put kinks into the closed lid
     w_ = max(1, int(0.001 / SPAN * RES)); zb_s = z_b_px.astype(float); zb_s[~cols] = np.nan
-    zb_s = np.array([np.nanmedian(zb_s[max(0, i - w_):i + w_ + 1]) if cols[i] else np.nan for i in range(RES)])
+    zb_s = np.array([np.nanmedian(zb_s[max(0, i - w_):i + w_ + 1]) if cols[i] else np.nan for i in range(RES)]) if cols.any() else zb_s
     z_b_px = np.where(cols, np.round(zb_s), -1).astype(int)
     chk = im.copy(); chk[brow_m, 0] = 255   # the brow found in red, the lid edge in green (a check image)
     for x_ in range(RES):
@@ -138,6 +150,49 @@ for side in (-1, 1):
     vx, vy = to_px(wb)
     inn = mv & (vx >= 0) & (vx < RES)
     idx = np.nonzero(inn)[0]
+    if LASH:
+        # the painted lash band: from the lid's edge (a quadratic through the lid edge vertices: the per-column highest vertex
+        # zigzagged up into the lashes) up LASH_MAX mm, stopping 1 mm under the brow and at 0.6 of the gap to it. Found by height,
+        # not darkness: light, thin painted lashes did not pass a darkness test (a 0.8 mm band where they reach about 4 mm)
+        pc_ = np.polyfit(lx, ly, 2); xs_ = np.arange(RES)
+        # the band reaches LASH_SIDE mm past the lid edge vertices on each side (the outer lashes run past the last of them)
+        m_ = LASH_SIDE / SPAN * RES
+        edge = np.polyval(pc_, np.clip(xs_, lx.min() - m_, lx.max() + m_))
+        okt = (xs_ >= lx.min() - m_) & (xs_ <= lx.max() + m_)
+        top = edge - LASH_MAX / SPAN * RES
+        hb = z_b_px >= 0
+        top[hb] = np.maximum(top[hb], np.maximum(z_b_px[hb] + 0.001 / SPAN * RES, edge[hb] - 0.6 * (edge[hb] - z_b_px[hb])))
+        # only where there is room for the stretch between the band and the brow (LASH_GAP mm or more from the lid's edge to the
+        # brow): with a low brow, shrinking the band pushed the stretch up into the brow's edge and its hairs streaked the closed
+        # lid again (the man's short painted lashes had no streaks to remove)
+        okt &= ~hb | ((edge - z_b_px) * SPAN / RES >= LASH_GAP)
+        tm = np.where(okt, top, np.nan)
+        if okt.sum() > 10:
+            lidv = np.nonzero(lid)[0]
+            for i in idx:
+                x_ = vx[i]
+                if np.isnan(tm[x_]) or vy[i] >= edge[x_] - 0.0005 / SPAN * RES:
+                    continue
+                r_ = max(1.0, LASH_RAMP / SPAN * RES)
+                w = float(np.clip(1 - (tm[x_] - vy[i]) / r_, 0, 1)) if vy[i] < tm[x_] else 1.0
+                # its lid edge vertex: the nearest in 3D among those within LASH_COL mm of its column (the nearest of all was at times
+                # another part of the lid, and pulling to it threw lid pieces out; the nearest by column alone left steps)
+                cand = lidv[np.abs(lx - x_) <= LASH_COL / SPAN * RES]
+                if w <= 0 or not len(cand):
+                    continue
+                e_i = cand[np.argmin(np.linalg.norm(base[cand] - base[i], axis=1))]
+                # only the lid's outer skin (within LASH_BACK mm of its edge vertex in depth): the eye socket's inner vertices lie about 20 mm behind it and, pulled to the closed lid's
+                # edge, came 30 mm forward through it as spikes (-y is the front)
+                if wb[i, 1] - wb[e_i, 1] < LASH_BACK:
+                    follow[i] = w; edge_of[i] = e_i
+            for x_ in np.nonzero(okt)[0]:
+                chk[int(np.clip(edge[x_], 0, RES - 1)), x_] = (255, 255, 0)
+            chk[np.clip(np.nan_to_num(tm, nan=0).astype(int), 0, RES - 1)[okt], np.nonzero(okt)[0]] = (0, 128, 255)
+            ci = bpy.data.images.new('bb_chk2', RES, RES); ci.pixels.foreach_set(np.dstack([chk[::-1] / 255, np.ones((RES, RES, 1))]).astype(np.float32).ravel())
+            ci.filepath_raw = os.path.join(os.path.dirname(os.path.abspath(out)), 'blink_brow_%s.png' % ('r' if side < 0 else 'l')); ci.file_format = 'PNG'; ci.save()
+            bpy.data.images.remove(ci)
+            print('BLINK_BROW side %+d: painted lash band over %d columns, %.1f mm high (median); %d vertices move with the lid edge'
+                  % (side, okt.sum(), np.nanmedian(edge[okt] - top[okt]) * SPAN / RES * 1000, ((follow > 0) & (np.sign(base[:, 0]) == side)).sum()))
     zb = z_b_px[vx[idx]]; has = zb >= 0
     gap_px = zb - lid_y[vx[idx]]                                   # negative: brow pixels' bottom is above the lid (px grow down)
     # 0 at the brow's lower edge, back to 1 by RAMP_FRAC of the way to the lid's edge (smoothstep): the lower part of the lid keeps
@@ -151,7 +206,20 @@ for side in (-1, 1):
 bpy.data.objects.remove(co_)
 
 for k in keys:
-    co = (base + disp[k.name] * scale[:, None]).ravel()
+    d = disp[k.name] * scale[:, None]
+    if k.name.startswith(('eyeBlink', 'blink_')):
+        # on the closed lid, each band vertex keeps the key's own place on the lid's surface but is pulled along the line to its
+        # lid edge vertex until it is as far from it as when open: the band is not stretched, and the vertices stay on the lid
+        # (moving them as one piece with the edge folded the lid over the eyeball into faceted steps)
+        fi = np.nonzero(follow > 0)[0]
+        if len(fi):
+            e_ = edge_of[fi]; ce = base[e_] + disp[k.name][e_] * scale[e_, None]; cv_ = base[fi] + d[fi]
+            # the stretch as seen from the front: the height above the lid edge vertex (z), open against closed (the 3D distance
+            # missed it, the lid closing round the eyeball)
+            r_open = np.maximum(base[fi, 2] - base[e_, 2], 0); r_cl = np.maximum(cv_[:, 2] - ce[:, 2], 1e-6)
+            tgt = ce + (cv_ - ce) * np.minimum(1, r_open / r_cl)[:, None]
+            d[fi] = d[fi] * (1 - follow[fi, None]) + (tgt - base[fi]) * follow[fi, None]
+    co = (base + d).ravel()
     k.data.foreach_set('co', co)
 me.update()
 print('BLINK_BROW keys', ', '.join(k.name for k in keys))

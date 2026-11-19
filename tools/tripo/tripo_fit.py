@@ -1,10 +1,10 @@
-"""Fit the MPFB basemesh head onto a Tripo head mesh: one smooth Gaussian-RBF warp (the same form fit.py writes,
-so apply.py uses it as is), driven by the MediaPipe landmarks plus dense closest points on the Tripo skin.
+"""Fit the MPFB basemesh head onto an input head mesh: one smooth Gaussian-RBF warp (the same form fit.py writes,
+so apply.py uses it as is), driven by the MediaPipe landmarks plus dense closest points on the input head's skin.
 
 python tripo_fit.py CORR_NPZ TRIPO_DIR OUT_NPZ [--centers 700 --sigma 0.013 --dense 3 --lap 10]
 TRIPO_DIR holds tripo_mesh.npz, tripo_basecolor.png, lm3d.npy (tripo_export.py, tripo_lm.py),
 and base_uvmesh.npz (export_uv.py on the unwarped base: vertex UVs and the eyeballs).
-Also writes OUT_DIR/tripo_in_mpfb.npz: the Tripo vertices moved into the basemesh frame (for baking).
+Also writes OUT_DIR/tripo_in_mpfb.npz: the input head's vertices moved into the basemesh frame (for baking).
 Dense targets skip the hair (dark texels), the eye openings (lids follow the eye landmarks only) and
 the mouth-cavity and eye-socket UV islands. Each eyeball centre moves with the mean of its eye corners and lid middles.
 """
@@ -34,7 +34,7 @@ def vertex_normals(x, tris):
 
 
 def surface_samples(co, tris, tuv, tex, steps=7):
-    """points on every Tripo triangle (barycentric grid), with face normal and texture colour."""
+    """points on every input-head triangle (barycentric grid), with face normal and texture colour."""
     g = [(i, j) for i in range(steps + 1) for j in range(steps + 1 - i)]
     B = np.array([[(steps - i - j) / steps, i / steps, j / steps] for i, j in g])   # (G,3)
     V = co[tris]                                                                     # (T,3,3)

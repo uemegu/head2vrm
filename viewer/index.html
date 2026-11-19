@@ -35,6 +35,7 @@
 <div id="panel">
   <h2>表示</h2>
   <label class="chk"><input type="checkbox" id="autoblink" checked> 自動でまばたき</label>
+  <label class="chk"><input type="checkbox" id="lit"> 光を当てる</label>
   <div style="margin-top:6px"><button id="reset">表情をすべて 0 に</button></div>
   <h2>表情（VRM の標準）</h2>
   <div id="presets"></div>
@@ -48,6 +49,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { VRMLoaderPlugin, VRMUtils } from '@pixiv/three-vrm';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { createClosedLid } from './closed-lid.js';
 
 const PRESET_LABEL = { aa: 'あ', ih: 'い', ou: 'う', ee: 'え', oh: 'お', blink: 'まばたき', blinkLeft: '左目を閉じる', blinkRight: '右目を閉じる',
   happy: '笑顔', angry: '怒り', sad: '悲しみ', surprised: '驚き', relaxed: '穏やか' };
@@ -68,7 +70,7 @@ addEventListener('resize', resize); resize();
 
 let envTex = null;
 const roomEnv = () => envTex ??= new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(), 0.04).texture;
-let vrm = null, values = {}, blinkT = 3, blinkPhase = -1;
+let vrm = null, closedLid = null, values = {}, blinkT = 3, blinkPhase = -1;
 const $ = (id) => document.getElementById(id);
 
 function slider(parent, name, label) {
@@ -89,6 +91,9 @@ async function open(url) {
   VRMUtils.rotateVRM0(vrm);
   scene.add(vrm.scene);
   if (vrm.lookAt) vrm.lookAt.target = lookTarget;
+  // the arms down (50 degrees, about the body's own modelled pose): a VRM rests in a T-pose, and with the arms raised the base body's
+  // shoulders bunched up beside the neck
+  for (const [bone, sign] of [['leftUpperArm', -1], ['rightUpperArm', 1]]) vrm.humanoid.getNormalizedBoneNode(bone)?.rotation.set(0, 0, sign * THREE.MathUtils.degToRad(50));
   // the cornea (its own glossy, clear material) mirrors a room, as apps with environment lighting do; this viewer has no
   // environment, so only the one key light would reflect, and it falls under the upper lid. Only the cornea gets it.
   vrm.scene.traverse((o) => { if (o.isMesh) for (const m of [].concat(o.material)) if (/cornea/i.test(m.name)) { m.envMap = roomEnv(); m.envMapIntensity = 0.3; m.needsUpdate = true; } });   // 0.3: 1.0 greyed the iris again
@@ -101,8 +106,31 @@ async function open(url) {
   const em = vrm.expressionManager;
   for (const n of Object.keys(PRESET_LABEL)) if (em.getExpression(n)) slider($('presets'), n, PRESET_LABEL[n]);
   for (const e of em.customExpressions ?? []) slider($('arkit'), e.expressionName, e.expressionName);
+  // the closed lids' cleaned skin (NAME-closedlid.json beside the model, made by make_face.sh), always on when present
+  closedLid = typeof url === 'string' && !url.startsWith('blob:') ? await createClosedLid(vrm, new URL(url, location.href).href).catch(() => null) : null;
+  plainSaved = new Map(); applyPlain(!$('lit').checked);
   $('msg').textContent = `${vrm.meta?.name ?? ''}　ドラッグで回す・ホイールで寄る`;
 }
+
+// The plain look (default): the textures as they are, without light or shading, the way the source model's own viewer shows
+// it (a texture-only view: every direction alike). The cornea keeps its reflection. "光を当てる" switches back to the lights.
+let plainSaved = new Map();
+function applyPlain(on) {
+  if (!vrm) return;
+  vrm.scene.traverse((o) => {
+    if (!o.isMesh) return;
+    if (on && !plainSaved.has(o)) {
+      const m = o.material; plainSaved.set(o, m);
+      const conv = (x) => /cornea/i.test(x.name) || !x.isMeshStandardMaterial ? x
+        : new THREE.MeshBasicMaterial({ map: x.map || null, color: x.map ? 0xffffff : x.color, transparent: x.transparent, opacity: x.opacity,
+                                        alphaTest: x.alphaTest, side: x.side, depthWrite: x.depthWrite, name: x.name });
+      o.material = Array.isArray(m) ? m.map(conv) : conv(m);
+    } else if (!on && plainSaved.has(o)) {
+      o.material = plainSaved.get(o); plainSaved.delete(o);
+    }
+  });
+}
+$('lit').onchange = () => applyPlain(!$('lit').checked);
 
 $('reset').onclick = () => { values = {}; document.querySelectorAll('#panel input[type=range]').forEach((i) => { i.value = 0; i.nextElementSibling.textContent = '0'; }); };
 
@@ -121,6 +149,7 @@ renderer.setAnimationLoop(() => {
     }
     if (vrm.lookAt) lookTarget.position.copy(camera.position);   // the eyes on the viewer (following the mouse was dropped: the gaze keys gave only left or right)
     vrm.update(dt);
+    if (closedLid) closedLid.update();
   }
   renderer.render(scene, camera);
 });
@@ -131,7 +160,7 @@ addEventListener('drop', (e) => { e.preventDefault(); $('drop').style.display = 
   const f = e.dataTransfer.files[0]; if (f) open(URL.createObjectURL(f)).catch((err) => { $('msg').textContent = '開けませんでした：' + err.message; }); });
 const m = new URLSearchParams(location.search).get('model');
 if (m) open(m).catch((err) => { $('msg').textContent = '開けませんでした：' + err.message; });
-window.viewer = { renderer, scene, camera, controls, get vrm() { return vrm; }, set(n, v) { values[n] = v; } };
+window.viewer = { renderer, scene, camera, controls, get vrm() { return vrm; }, get closedLid() { return closedLid; }, set(n, v) { values[n] = v; } };
 </script>
 </body>
 </html>

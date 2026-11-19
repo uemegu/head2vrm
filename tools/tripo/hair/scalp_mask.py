@@ -1,5 +1,5 @@
-"""Which skin texels sit under the grafted Tripo hair: a ray out along the skin normal meets the hair within REACH mm.
-The face Tripo gave (within NEAR mm of its surface and facing forward) is kept out.
+"""Which skin texels sit under the grafted input hair: a ray out along the skin normal meets the hair within REACH mm.
+The input's face (within NEAR mm of its surface and facing forward) is kept out.
 blender --background textured_hair.blend --python scalp_mask.py -- OUT_DIR MASK.npy   (mask at 1/STEP of the texel grid)"""
 import os, sys
 import bpy
@@ -24,7 +24,7 @@ k = (top_z - eye_z) / 0.114
 at = lambda dz: eye_z + dz * k
 ys, xs = np.nonzero(have & (pos[..., 2] > at(-0.19)))
 d = dq[ys, xs]
-keep_face = (d < NEAR) & ((nrm[ys, xs, 1] < 0.2) | (np.abs(pos[ys, xs, 0]) > 0.062 * k))   # Tripo's face and ears, not the back of its neck
+keep_face = (d < NEAR) & ((nrm[ys, xs, 1] < 0.2) | (np.abs(pos[ys, xs, 0]) > 0.062 * k))   # the input's face and ears, not the back of its neck
 CROWN = at(float(os.environ.get('CROWN', 0.02)))   # above this every non-face texel is scalp (the hair part has holes on the crown)
 BACK_Z, BACK_Y = at(float(os.environ.get('BACK_Z', -0.04))), float(os.environ.get('BACK_Y', 0.02)) * k   # and behind the ears above the nape (holes at the back)
 print('SCALP_MASK eyes %.3f top %.3f scale %.2f' % (eye_z, top_z, k))

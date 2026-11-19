@@ -1,10 +1,10 @@
-"""The lips onto the Tripo head's own mouth as seen from the lid-fit camera, by an as-rigid-as-possible deformation.   any face
+"""The lips onto the input head's own mouth as seen from the lid-fit camera, by an as-rigid-as-possible deformation.   any face
 python mouth_arap.py OUT_DIR          (cwd: tripo/; after lid_arap.py; CHECK=1 only draws what is extracted and stops)
 
-Why: seam_fit.py puts the lip seam on Tripo's lines in a straight-on orthographic view, so depth is free; from the
+Why: seam_fit.py puts the lip seam on the input's lines in a straight-on orthographic view, so depth is free; from the
 viewer's camera (10.4 deg above) the mouth corners came 1.8 mm low and both lips 0.6-1.3 mm too full: the corners stood further
-forward than Tripo's. Here the targets are 3D: MediaPipe's lip contour (outer and inner) on the Tripo head rendered from the
-lid-fit camera (lidfit/warp/v0_tripo.png), each point where its pixel's ray meets the Tripo surface.
+forward than the input's. Here the targets are 3D: MediaPipe's lip contour (outer and inner) on the input head rendered from the
+lid-fit camera (lidfit/warp/v0_tripo.png), each point where its pixel's ray meets the input surface.
 Handles: each landmark's point on the base mesh (its corr.npz triangle, the vertex with the largest weight); one whose current
 place is more than DROP mm from its target is left out (a bad correspondence). The region within REGION mm of the mouth's centre
 is solved as-rigid-as-possible against its shape before (cotangent weights clamped positive), the border fixed, in STEPS steps.
@@ -136,7 +136,7 @@ if open(f'{L}/check_lines.txt').read() and os.popen(f'md5 -q {L}/check_lines.txt
     print('MOUTH_CHECK waiting: approve', f'{L}/check.jpg'); sys.exit(3)
 pts = {int(r.split()[0]): np.array([float(v) for v in r.split()[1:]]) for r in open(f'{L}/check_lines.txt') if r.strip()}
 
-# the targets in 3D: each approved pixel's ray onto the Tripo surface (the nearest hit)
+# the targets in 3D: each approved pixel's ray onto the input surface (the nearest hit)
 tm = np.load(f'{O}/tripo_in_mpfb.npz'); TV = tm['co'][tm['tris']]
 e1, e2 = TV[:, 1] - TV[:, 0], TV[:, 2] - TV[:, 0]
 
@@ -170,10 +170,10 @@ for i in ids:
     hv.append(vtx); T.append(tg[i])
 hv, first = np.unique(np.array(hv), return_index=True); T = np.array(T)[first]
 # the outer lip line (ONTO_LINE, default on): which base vertex a landmark lands on is good across the line but not
-# along it. By the corners the base's 146/375/185 sit 20-26 px nearer the corner than Tripo's, and pulling them along the line
+# along it. By the corners the base's 146/375/185 sit 20-26 px nearer the corner than the input's, and pulling them along the line
 # squeezed the corners (crumpled when the mouth opens) and the lower lip's border (the mouth's inside showed through under it).
 # Each outer handle but the corners goes to the nearest point of its approved line (a spline through the line's points) from where
-# it is now, on the Tripo surface along that pixel's ray: it moves across the line only.
+# it is now, on the input surface along that pixel's ray: it moves across the line only.
 if E_('ONTO_LINE', 1):
     from scipy.interpolate import CubicSpline
     vtx_of = {i: int(c['trip'][cid[i]][np.argmax(c['bary'][cid[i]])]) for i in ids if i in cid}

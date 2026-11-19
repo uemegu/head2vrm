@@ -1,14 +1,14 @@
-"""Round the eyes, the skin takes Tripo's colour as seen from the camera the lid lines were fitted in (projection), not from the
+"""Round the eyes, the skin takes the input's colour as seen from the camera the lid lines were fitted in (projection), not from the
 closest point in 3D.   any face, after run.sh with LID_FIT (it reads the camera lid_arap.py used)
 python lid_project.py OUT_DIR SKIN_IN SKIN_OUT
 
-Why: the bake (tripo_tex.py) gives each texel the colour of the closest point on the Tripo surface. MPFB's lids
-curl in towards the eyeball more than Tripo's flat painted eye, so just above the upper margin the closest Tripo point was the
+Why: the bake (tripo_tex.py) gives each texel the colour of the closest point on the input surface. MPFB's lids
+curl in towards the eyeball more than the input's flat painted eye, so just above the upper margin the closest input point was the
 painted eye itself: a band of iris and white colours sat on the lid above the fitted margin, and lash_erase.py smeared it into a
-dull grey band. The margins were fitted to Tripo's eye outline as seen from this camera, so here a texel takes the colour of the
-Tripo surface on the same camera ray: from that view the lids show exactly what Tripo painted there.
+dull grey band. The margins were fitted to the input's eye outline as seen from this camera, so here a texel takes the colour of the
+input surface on the same camera ray: from that view the lids show exactly what the input texture shows there.
 Which texels: within an ellipse round each eye (x: EX * the ball's radius, up EU, down ED; full inside FULL of it), facing the
-camera, and not hidden from it (by the skin in front or the eyeball, a sphere); the Tripo hit within MAXD of the texel along the
+camera, and not hidden from it (by the skin in front or the eyeball, a sphere); the input hit within MAXD of the texel along the
 ray. The weight is softened in UV (sigma 2 texels). Prints the texels replaced per eye.
 """
 import json
@@ -117,7 +117,7 @@ for sgn in (1, -1):
     oc = Cc - c; bq = (d * oc).sum(1); cq = (oc * oc).sum() - r * r; disc = bq * bq - (d * d).sum(1) * cq
     tb = np.where(disc > 0, (-bq - np.sqrt(np.maximum(disc, 0))) / (d * d).sum(1), np.inf).reshape(gx.shape)
     Zocc = np.minimum(Zs, tb)
-    # Tripo's colour along each ray
+    # the input's colour along each ray
     T = to_cam(m['co'][m['tris']])
     near_tr = (T[..., 0].max(1) >= box[0]) & (T[..., 0].min(1) <= box[2]) & (T[..., 1].max(1) >= box[1]) & (T[..., 1].min(1) <= box[3])
     Zt, UVt = raster(T[near_tr], m['tuv'][near_tr], box)
@@ -128,8 +128,8 @@ for sgn in (1, -1):
     h, w = tex.shape[:2]
     col = tex[np.clip(((1 - uv[:, 1]) * (h - 1)).round().astype(int), 0, h - 1), np.clip((uv[:, 0] * (w - 1)).round().astype(int), 0, w - 1)]
     wgt = np.clip((1 - rho[k]) / (1 - FULL), 0, 1) * (facing & visible & hit)
-    # skin never takes what Tripo painted inside its eye opening: a texel of ours that projects inside the approved outline (where
-    # Tripo shows the eyeball) by more than IN_MM is left to the nearest texel outside it (the hidden-texel pass below). The colour
+    # skin never takes what the input texture shows inside its eye opening: a texel of ours that projects inside the approved outline (where
+    # the input shows the eyeball) by more than IN_MM is left to the nearest texel outside it (the hidden-texel pass below). The colour
     # test after this caught only the purest white; mixed white stayed on the lids
     inside_px = OUTLINE[np.clip(Q[:, 1].astype(int), 0, RES - 1), np.clip(Q[:, 0].astype(int), 0, RES - 1)]
     in_eye = inside_px * (Q[:, 2] / F * 1000) > E('IN_MM', 0.1)
@@ -140,11 +140,11 @@ for sgn in (1, -1):
     Pc[ys[k][wgt > 0], xs[k][wgt > 0]] = col[wgt > 0]
     print('LID_PROJECT eye %+d: zone texels %d, facing %d, visible %d, hit %d, replaced %d' % (sgn, len(k), facing.sum(), visible.sum(), hit.sum(), (wgt > 0.5).sum()))
 # the lids' under-edges and anything else in the zones the camera does not see (they face down or hide behind the margin) kept the
-# closest-point bake: Tripo's painted white, a pale band along the margin seen from straight ahead. They take the
+# closest-point bake: the input's painted white, a pale band along the margin seen from straight ahead. They take the
 # colour of the nearest projected texel in 3D within REACH_HID, so the rim's colour wraps round the margin.
 from scipy.spatial import cKDTree
 got = Wt > 0.5
-# where our lid lies over what Tripo painted as the eyeball (its opening a little wider than ours here and there, mostly at the
+# where our lid lies over what the input texture shows as the eyeball (its opening a little wider than ours here and there, mostly at the
 # corners), the lid took the white (the eye's white baked onto the lid). Projected texels of the eyeball's white (light, nearly
 # grey: chroma under SCL_C, L over SCL_L in Lab) count as not projected, and take the nearest projected skin colour below.
 lab_p = cv2.cvtColor(np.clip(Pc * 255, 0, 255).astype(np.uint8), cv2.COLOR_RGB2LAB).astype(np.float32)
@@ -166,7 +166,7 @@ if len(gy):
         zone_all |= have & (np.hypot((pos[..., 0] - c2[0]) / (EX * r2), dz) < FULL) & (pos[..., 1] < c2[1] + r2)
     hy, hx = np.nonzero(zone_all & ~got)
     d_, j_ = tree.query(pos[hy, hx], workers=-1)
-    ok = d_ < E('REACH_HID', 0.005)   # 1.5 mm left the lid's inner side further back with Tripo's painted white
+    ok = d_ < E('REACH_HID', 0.005)   # 1.5 mm left the lid's inner side further back with the input's painted white
     Pc[hy[ok], hx[ok]] = Pc[gy[j_[ok]], gx[j_[ok]]]; Wt[hy[ok], hx[ok]] = 1.0
     print('LID_PROJECT hidden texels given the nearest projected colour: %d' % ok.sum())
 if os.environ.get('SRC_DEBUG'):   # which route each texel's colour took: green projected, blue the nearest projected, red the bake

@@ -2,7 +2,7 @@
 blender -b warped.blend -P eye_center.py -- OUT_DIR OUT_BLEND      (OUT_DIR: run.sh's, with lm3d.npy and warp.npz)
 tripo_fit.py moves the eyeballs with the lids, but seam_fit.py then moves only the margins onto the painted lines: on one test head the
 irises sat 2 % of the eye's width outside the openings' middles (both outward, 0.48 / 0.52 between the corners).
-The opening: the middle of Tripo's own corner landmarks (MediaPipe 33/133, 362/263 on its head, lm3d.npy, in MPFB's frame by
+The opening: the middle of the input head's own corner landmarks (MediaPipe 33/133, 362/263 on its head, lm3d.npy, in MPFB's frame by
 the fit's similarity, warp.npz); seam_fit.py puts the lid corners on them. The mesh margin's x extremes were not the corners one
 sees (they moved the eyes outward). Checked on the viewer: gaze_check.py (the eyeball's +z pole between MediaPipe's corners).
 The eyeball (Human.high-poly, every shape key too) moves by middle - centre in x."""

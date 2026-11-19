@@ -1,4 +1,4 @@
-"""Tripo GLB -> mesh npz (world verts, tris, uv per corner, texture) + flat-lit orthographic renders for landmarks.
+"""Input head GLB -> mesh npz (world verts, tris, uv per corner, texture) + flat-lit orthographic renders for landmarks.
 
 blender --background --python tripo_export.py -- HEAD_GLB OUT_DIR
 Renders use the texture as emission (no lighting), Standard view transform.

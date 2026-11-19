@@ -1,5 +1,5 @@
-"""The inward shift s(z) per side that takes Tripo's front outline onto the portrait's (both MediaPipe's face oval in the
-orthographic level front render / the portrait, the portrait put on Tripo's eyes by a similarity). Lower face only: 0 at the eye
+"""The inward shift s(z) per side that takes the input head's front outline onto the portrait's (both MediaPipe's face oval in the
+orthographic level front render / the portrait, the portrait put on the input head's eyes by a similarity). Lower face only: 0 at the eye
 line, full from the cheekbone (lm 93's height) down; never outward (the portrait's longer chin is not added).
 python slim_target.py HEAD_VERTS.npz LM_TRIPO.npy LM_PHOTO.npy OUT.npz [GAIN]"""
 import sys, numpy as np

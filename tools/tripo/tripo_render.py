@@ -1,4 +1,4 @@
-"""Side-by-side renders: the Tripo head (moved into the basemesh frame) and the warped MPFB head with the Tripo skin.
+"""Side-by-side renders: the input head (moved into the basemesh frame) and the warped MPFB head with the baked input skin.
 
 blender --background warped.blend --python tripo_render.py -- TRIPO_IN_MPFB_NPZ TRIPO_BASECOLOR SKIN_PNG OUT_DIR
 Writes OUT_DIR/r_<view>_<tripo|mpfb>.png. Same lights and cameras for both; hair cards, clothes and shoes hidden.

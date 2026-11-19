@@ -1,7 +1,7 @@
-"""The lid skin next to the lashes made programmatically from the approved lid lines, instead of patching Tripo's painting.   any face
+"""The lid skin next to the lashes made programmatically from the approved lid lines, instead of patching the painted texture.   any face
 python lid_paint.py OUT_DIR SKIN_IN SKIN_OUT      (after lid_project.py; eyeliner.py draws the line after it; lash_new.py the lashes)
 
-Why: Tripo paints the lashes densely over the 2 mm of lid above the margin (and sparser ones under the lower lid),
+Why: the input texture can paint the lashes densely over the 2 mm of lid above the margin (and sparser ones under the lower lid),
 so there is no skin under them to recover. Erasing and filling (lash_erase.py, then lid_clean.py: smear, flat patches, grey) only
 ever invented colour. So it is made programmatically from the known shape, not by matching the original.
 How, per eye, in the lid-fit camera (lidfit/warp/v0_cam.json) against the approved lines (lidfit/check_lines.txt):
@@ -58,7 +58,7 @@ for sgn in (1, -1):
     x0, x1, lx, lu, ll = min(eyes, key=lambda e_: abs((e_[0] + e_[1]) / 2 - cx))
     pxc = np.clip(px, x0, x1)
     past = np.maximum(x0 - px, px - x1) * mm                    # mm past the nearer corner (negative inside)
-    # 1 inside, fading to 0 EXT mm past the outer corner (Tripo's lashes sweep out there) but only EXT_IN past the inner one: reaching
+    # 1 inside, fading to 0 EXT mm past the outer corner (the painted lashes sweep out there) but only EXT_IN past the inner one: reaching
     # past it, the lower band took the red under the inner corner as its skin and left a pink spot by the nose
     inner_left = abs(x0 - RES / 2) < abs(x1 - RES / 2)
     past_inner = (px < x0) if inner_left else (px > x1)
@@ -66,7 +66,7 @@ for sgn in (1, -1):
     above = (np.interp(pxc, lx, lu) - py) * mm                  # mm above the upper line
     below = (py - np.interp(pxc, lx, ll)) * mm                  # mm below the lower line
     col = img[ys, xs]; gr = np.clip(grain[ys, xs], -GRAIN, GRAIN)
-    # past the inner corner the caruncle's pink Tripo painted fell on the skin by the nose, a pink spot: within CAR mm past
+    # past the inner corner the caruncle's pink painted in the texture fell on the skin by the nose, a pink spot: within CAR mm past
     # that corner and near its height, texels redder than the skin round them take that skin's colour
     inner_x = x0 if abs(x0 - RES / 2) < abs(x1 - RES / 2) else x1
     ci = np.argmin(np.abs(lx - inner_x)); cy = (lu[ci] + ll[ci]) / 2

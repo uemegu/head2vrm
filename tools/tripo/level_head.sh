@@ -1,5 +1,5 @@
 #!/bin/bash
-# Any Tripo head GLB -> OUT_DIR/head.glb turned level, the angle measured, not given.   level_head.sh GLB OUT_DIR [HAIR_GLB]   (cwd: tripo/)
+# Any input head GLB -> OUT_DIR/head.glb turned level, the angle measured, not given.   level_head.sh GLB OUT_DIR [HAIR_GLB]   (cwd: tripo/)
 # HAIR_GLB (hair/parts.py, in the head part's frame): turned by the same angle about the same point -> OUT_DIR/hair.glb
 # 1. an orthographic front render (level_front.py), MediaPipe's landmarks on it, each lifted onto the mesh by a ray (level_lm3d.py)
 # 2. the lean: the mean angle in the face's plane of the left-right pairs (eye corners outer and inner, brows, mouth corners, cheeks)

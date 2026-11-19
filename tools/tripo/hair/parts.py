@@ -1,10 +1,10 @@
-"""Which parts of a Tripo GLB are the head and which the hair, by what their textures show (not by size: in one GLB the hair is the
+"""Which parts of an input GLB are the head and which the hair, by what their textures show (not by size: in one GLB the hair is the
 largest part, in another the face). -> OUT_DIR/parts.json, and OUT_DIR/hair.glb when a hair part is found.
 
 blender --background --python parts.py -- GLB OUT_DIR
 env HEAD_PART: auto (default) or a part number; HAIR_PART: auto (default), none, or a part number.
 
-Each part with MIN_VERTS vertices or more: the share of its surface whose texture is skin (the hair_cut.py test, sampled at 7 points
+Each part with MIN_VERTS vertices or more: the share of its surface whose texture is skin (sampled at 7 points
 on every face), and the faces' median colour. The head is the part with the most skin; the hair is the largest other part that
 reaches the head's top and is either under HAIR_MAX_SKIN skin or darker than HAIR_DARKER of the head (brown hair is skin-coloured
 by the test: one test head's hair 0.71 skin, but its median lightness 120 against the face's 207). Blond or white hair may need HAIR_PART (its top within 15% of the head's height of the head's top). Small parts (eyes, teeth, scraps) are left out.
@@ -54,7 +54,7 @@ def skin_share(o):
 
 
 def feat_stats(rgb):
-    """[mean L, sd L, mean warmth, sd warmth] of the part's colours; hair_cut.py / hair_skin_out.py tell skin from hair with them"""
+    """[mean L, sd L, mean warmth, sd warmth] of the part's colours"""
     L = rgb.mean(1); w = (rgb[:, 0] - rgb[:, 2]) / (rgb[:, 0] + 10)
     return [round(float(L.mean()), 2), round(float(L.std()) + 1, 2), round(float(w.mean()), 4), round(float(w.std()) + 0.01, 4)]
 

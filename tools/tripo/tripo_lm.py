@@ -1,4 +1,4 @@
-"""MediaPipe landmarks on the flat-lit Tripo views, cast onto the Tripo surface -> 3D landmarks (Blender coords).
+"""MediaPipe landmarks on the flat-lit input-head views, cast onto the input surface -> 3D landmarks (Blender coords).
 
 python tripo_lm.py OUT_DIR   (reads views.json, tripo_mesh.npz; writes lm3d.npy (478,3), NaN where missed)
 The front view gives the points; the two 35-degree views only report how well they agree.

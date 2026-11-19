@@ -1,23 +1,23 @@
-"""The lips painted, not copied: a smooth colour field measured on Tripo's lips, its fine lines kept, no painted gloss or seam
+"""The lips painted, not copied: a smooth colour field measured on the input texture's lips, its fine lines kept, no painted gloss or seam
 shadow, and the lips' inner sides the colour of wet lip.   any face, after mouth_arap.py (it reads the approved mouth lines, the seam
 curve and the lid-fit camera)
 python lip_paint.py OUT_DIR SKIN_IN SKIN_OUT
 
-Why (the lips are painted here so they still look right when the mouth opens): Tripo
-painted a closed mouth on one surface, its seam's dark line, its light and a white gloss streak included. Copied onto our lips it gave
+Why (the lips are painted here so they still look right when the mouth opens): the input texture
+shows a closed mouth on one surface, its seam's dark line, its light and a white gloss streak included. Copied onto our lips it gave
 a pale band above the seam and a ragged seam, and with the mouth open the lips' inner sides showed skin colour and white.
 - Where (in the lid-fit camera): the lips lie between the approved outer lines (splines through their points); the seam is
   mouth_arap.py's curve. Each point has lip coordinates: u along the mouth (0 left corner, 1 right), v across a lip (0 at the seam,
   1 at its outer line).
-- Colour: Tripo's lips (lidfit/warp/v0_tripo.png, unlit) sampled at many (u, v) of each lip (a 3x3 median in Lab), leaving out the
+- Colour: the input head's lips (lidfit/warp/v0_tripo.png, unlit) sampled at many (u, v) of each lip (a 3x3 median in Lab), leaving out the
   gloss (lighter than LIGHT over the lip's median and paler) and the seam band (v < V_SEAM) and the border (v > V_EDGE); per lip and
   channel, a least-squares surface (degree DU in u, DV in v), refitted without the worst residuals. No line is drawn on the seam:
   the seam's shadow is left to the light (a drawn seam line is not needed; the shading makes it).
-- Fine lines: Tripo's lightness minus its blur (sigma DETAIL_S px), times DETAIL, except on the gloss and the seam band.
-- The border: the lip colour fades into the skin over EDGE_W px across the outer line (Tripo's redness falls over about that).
+- Fine lines: the input's lightness minus its blur (sigma DETAIL_S px), times DETAIL, except on the gloss and the seam band.
+- The border: the lip colour fades into the skin over EDGE_W px across the outer line (the input's redness falls over about that).
 - The inner sides: texels the camera does not see, within INNER mm of the seam rows, take the seam-side lip colour turning to wet lip
   (Lab: lightness x WET_L, a* + WET_A) by WET_MM, fading out to the texture as it was by INNER.
-Writes SKIN_OUT and OUT_DIR/mouthfit/lip_paint_check.jpg (Tripo, its field, the field with lines, as seen from the camera).
+Writes SKIN_OUT and OUT_DIR/mouthfit/lip_paint_check.jpg (the input head, its field, the field with lines, as seen from the camera).
 """
 import json
 import os
@@ -73,7 +73,7 @@ def lip_uv(x, y):
     return u, v, lip, inside
 
 
-# --- the colour field, measured on Tripo
+# --- the colour field, measured on the input head
 tri = cv2.imread(f'{O}/lidfit/warp/v0_tripo.png')[..., :3]
 lab = cv2.cvtColor(tri, cv2.COLOR_BGR2LAB).astype(np.float32)
 lab_med = cv2.medianBlur(cv2.cvtColor(tri, cv2.COLOR_BGR2LAB), 3).astype(np.float32)
@@ -116,8 +116,8 @@ def base_field(u, v, side):
 
 
 # ACROSS (without it the lips looked flat in colour): the viewer's B set shows the lips unlit, so the dark by the seam and the
-# border's fade, left out above for the light to make, never showed (the lower lip's L* spread 4.3 against Tripo's 16.4).
-# Tripo's own profile across each lip is put back: per lip, the median of Tripo minus the field above in bins of v (0 seam .. 1
+# border's fade, left out above for the light to make, never showed (the lower lip's L* spread 4.3 against the input's 16.4).
+# The input's own profile across each lip is put back: per lip, the median of the input minus the field above in bins of v (0 seam .. 1
 # outer line), over the middle of the mouth (u 0.15-0.85, the gloss left out), added at every u. One curve across, not a surface:
 # a degree-4 surface in both u and v ran off at the corners (L* 121 at the upper lip's right corner, -6 at the lower lip's left).
 ACROSS = E('ACROSS', 0)
@@ -149,8 +149,8 @@ seam_px = np.abs((gy[by0:by1, bx0:bx1] + 0.5) - seam_y(gx[by0:by1, bx0:bx1] + 0.
 dm[seam_px] = 0
 dmask = cv2.GaussianBlur(dmask, (0, 0), 1.5)
 detail *= dmask * DETAIL
-# the sparkle (SPARKLE): a reference face's lips glint from the fine light streaks Tripo painted on its lower lip, kept
-# in its texture. Another test head's Tripo has the same streaks in the same place, 2.3 times as strong (lightness above its 6 px blur, 99th
+# the sparkle (SPARKLE): a reference face's lips glint from the fine light streaks painted on its lower lip, kept
+# in its texture. Another test head's texture has the same streaks in the same place, 2.3 times as strong (lightness above its 6 px blur, 99th
 # percentile: reference 4.2, test head 9.9) and bluish white (b 4 against the lip's 11; the reference's keep the lip's b). Inside the gloss found above
 # they come back at SPARKLE of their strength (0.43 matched the reference in the texture but vanished in the viewer: the test head's texture holds 0.25 mm a texel, the reference's 0.07 mm; 1.0 kept), on the painted lip's own colour, a little less red (SPARKLE_A per unit of lightness)
 SPARKLE, SPARKLE_A = E('SPARKLE_TRIPO', 0), E('SPARKLE_A', 1.0)   # off: drawn lines below instead
@@ -243,8 +243,8 @@ Hv = have.astype(np.float32)
 Ws = gaussian_filter(Wt, 1.5) / np.maximum(gaussian_filter(Hv, 1.5), 1e-6) * Hv * (Wt > 0)
 Pc_s = gaussian_filter(Pc * Wt[..., None], (1.0, 1.0, 0)) / np.maximum(gaussian_filter(Wt, 1.0), 1e-6)[..., None]
 out = img * (1 - Ws[..., None]) + Pc_s * Ws[..., None]
-# gloss lines drawn by us (GLOSS_LINES; the lips need not be Tripo's texture, so the gloss is drawn rather than copied).
-# A reference face's lips glint from short fine light dashes along the lip's vertical lines over the upper half of the lower lip; Tripo's own
+# gloss lines drawn by us (GLOSS_LINES; the lips need not be the input texture, so the gloss is drawn rather than copied).
+# A reference face's lips glint from short fine light dashes along the lip's vertical lines over the upper half of the lower lip; the input's own
 # (on another test head) came out as soft blobs, being 0.1-0.2 mm wide on a texture of 0.25 mm a texel and blurred twice on the way. These are
 # evaluated at each visible texel from the lip's own (u, v) frame, unblurred: GL_N dashes, centres about u 0.5 (sd GL_USD) and
 # v GL_V (sd 0.08) below the seam, GL_LEN mm long (0.4-1.0 x), GL_W mm wide (a Gaussian), leaning out from the middle as the lip's
