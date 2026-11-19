@@ -1,129 +1,119 @@
-# face-maker：Tripo の頭から、表情が動く VRM を作る
+# face-maker：顔の 3D モデルから VRM アバターを作る
 
-[Tripo](https://www.tripo3d.ai/) で作った頭の 3D モデル（GLB）から、目・口・表情が動く VRM 1.0 のアバターを作ります。
+頭の 3D モデル（GLB）から、まばたき・口・表情が動く VRM 1.0 のアバターを作るツールです。顔の見た目は元のモデルのまま、体と服は付属の素体のものになります。
 
-作り方の考え方は、形と色を Tripo から、動きを素体から、というものです。MakeHuman の素体（MPFB で組んだ、ARKit の表情キー入りの体）の頭を、Tripo の頭の形に合わせて変形し、Tripo の肌と目の色を焼き付けます。顔の見た目は Tripo のまま、まばたき・口の形・表情は素体の仕組みで動きます。
+- まばたき、視線、あいうえおの口、VRM の標準の表情（笑顔・怒り・悲しみ・驚き）が動きます。
+- iPhone の顔トラッキング（ARKit）の 52 個の表情にも対応しています。
+- 髪があれば頭に載せて、揺れるようにします。
+- 1 人あたり数分です（Apple Silicon の Mac）。途中で 2 回、線の確認のために止まります。
 
-## できること
+## 動作環境・必要なもの
 
-- **目**：まばたき（左右別々）と視線。視線は VRM の表情キー方式なので、どのアプリでも見る先に合わせて目が動きます。黒目と白目は Tripo の絵を眼球へ写し、角膜にはつやのある透明な層を付けています。
-- **口**：あいうえお、舌、あごの開閉。
-- **表情**：VRM の標準の表情（笑顔・怒り・悲しみ・驚き・穏やか）と、ARKit の 52 個。iPhone の顔のトラッキングの値でそのまま動かせます。
-- **髪**：GLB に髪が別の部品として入っていれば、頭に載せます。揺れるように骨と VRM の揺れもの（SpringBone）を付け、髪の下の頭皮は髪の根元の色に塗ります。
-- **体**：素体の体・服・靴が付いた全身の VRM になります。`HEAD_ONLY=1` にすると、首で切った頭だけになります。
-
-1 人あたり数分です（M シリーズの Mac）。途中で 2 回、まぶたの線と口の線を人が確認するために止まります。
-
-## 必要なもの
-
-| もの | 確かめた版 | 入れ方 |
+| 必要なもの | 動作確認済みの版 | 準備方法 |
 |---|---|---|
 | macOS | 26 | — |
-| Blender | 5.2 LTS | https://www.blender.org/download/ から `/Applications` へ。別の場所なら `BLENDER=<実行ファイル>` |
-| MPFB（Blender の拡張機能） | 2.x | Blender の「編集 > プリファレンス > 機能拡張」で MPFB を入れて有効にし、MPFB の「Load pack」で **MakeHuman system assets**（CC0）を入れる |
-| VRM format（Blender のアドオン） | 3.x | 同じく「機能拡張」で VRM format を入れて有効にする |
-| Python | 3.12 | `setup.sh` が `tools/mpfb/.venv` に仮想環境を作り、`requirements.txt` を入れる |
-| MediaPipe Face Landmarker のモデル | float16/1 | `setup.sh` が Google の配布元から取る（約 3.6MB） |
+| Blender | 5.2 LTS | https://www.blender.org/download/ から `/Applications` へ配置 |
+| MPFB（Blender 拡張機能） | 2.x | Blender の「編集 > プリファレンス > 機能拡張」で MPFB を有効にし、MPFB の「Load pack」から **MakeHuman system assets** を導入 |
+| VRM format（Blender 拡張機能） | 3.x | 同じく「機能拡張」で VRM format を有効化 |
+| Python | 3.12 | 事前にインストール（仮想環境と必要なパッケージは `./setup.sh` が用意） |
 
-## 使い方
+リポジトリを取得したあと、最初に一度だけセットアップを実行します。必要なパッケージと学習済みモデル（MediaPipe Face Landmarker、約 3.6MB）を取得し、環境チェックを行います。足りないものがあれば直し方が表示されます。
 
 ```bash
-./setup.sh          # 最初に一度だけ。最後に ./check.sh（事前チェック）が走る
-./check.sh          # 足りないものと、その直し方を表示する
+git clone <このリポジトリの URL>
+cd face-maker
+./setup.sh
 ```
 
-1. 作業フォルダを作り（例：`work/myface/`）、`face.env.example` を `face.env` という名前でそこへコピーして、`NAME` と `HEAD_GLB` を書きます。`work/` の下はリポジトリの管理から外れます。
-2. 実行します。
+> Blender・MPFB の素材・Python 3.12 を標準と異なる場所に置いている場合は、環境変数 `BLENDER`・`MPFB_DATA`・`PYTHON` で指定できます（例：`PYTHON=/opt/homebrew/bin/python3.12 ./setup.sh`）。
+
+## 用意するもの
+
+- 頭の 3D モデル（GLB）を用意してください。顔にテクスチャ画像が貼られている必要があります。
+- 正面を向き、口を閉じ、目を開けた、人の顔として認識できるモデルにしてください。途中で顔の画像から目・口・鼻の位置を自動で検出するため、人の顔として検出できないモデルは処理できません。
+- 髪がある場合は、髪が頭とは別の部品（別メッシュ／別オブジェクト）に分かれている必要があります。同じモデルから書き出した **髪つきの頭** と **髪を外して顔だけにした頭** の 2 つを用意すると、髪に隠れた額や生え際まできれいに仕上がります（1 つの GLB 内に髪が別部品として分かれている場合でも動作します）。
+- 髪がない場合は、頭の GLB 1 つで作れます。
+- 仕上がりの印象は元のモデルの顔でほぼ決まります。作り始める前に、元のモデルの顔を確認しておくことをおすすめします。
+
+## 作り方
+
+1. 作業フォルダを作り、`face.env.example` を `face.env` としてコピーします。
+
+   ```bash
+   mkdir -p work/myface
+   cp face.env.example work/myface/face.env
+   ```
+
+2. `work/myface/face.env` に、名前と GLB のパスを書きます。
+
+   ```bash
+   NAME=myface
+   HEAD_GLB=/path/to/head.glb        # 髪なしの頭（髪がない、または 1 つの GLB にまとまっている場合はその頭）
+   HAIR_GLB=/path/to/head_hair.glb   # 髪つきの頭（HEAD_GLB と別に用意したときだけ書く）
+   BASE=base_asian                   # 体：base_asian（女性）か base_male（男性）
+   ```
+
+3. 実行します。
 
    ```bash
    ./make_face.sh work/myface
    ```
 
-3. **まぶたの線の確認で止まります（終了コード 3）。** `work/myface/out/lidfit/check.jpg` と `check_corners.jpg` を見て、線が目の縁に乗っていれば、表示されたコマンド（`md5 -q … > …/approved`）で承認して、同じコマンドをもう一度実行します。目頭・目尻が少しずれているときは `corner_adjust.txt` で、上まぶたの線全体が低いときは `UP_RAISE` で直せます（下の「設定」）。
-4. **口の線の確認で止まります。** `out/mouthfit/check.jpg` を見て、同じように承認して再実行します。
-5. できあがりは `work/myface/myface.vrm` です。`out/render_e0/cmp_*.jpg` に、Tripo（上）と作ったもの（下）を並べた比較画像が出ます。
+4. **まぶたの線の確認で止まります。** `work/myface/out/lidfit/check.jpg` と `check_corners.jpg` を開き、オレンジの線が目の縁に乗っているかを確認します。問題なければ、画面に表示された承認コマンドを実行し、手順 3 のコマンドをもう一度実行します。ずれているときは、下の「線がずれているとき」を参照してください。
+5. **口の線の確認で止まります。** `work/myface/out/mouthfit/check.jpg` を見て、線が唇の縁と合わせ目に乗っていれば、同じように画面に表示されたコマンドで承認し、もう一度実行します。
+6. `work/myface/myface.vrm` ができあがります。
 
-承認は線の中身に対して記録されます。入力や設定を変えて線が変わると、もう一度確認を求められます。合わせ直しを飛ばして、色の仕上げからやり直すときは `SKIP_RUN=1 ./make_face.sh work/myface` です。
+### 線がずれているとき
 
-### 確認用のビューア
+- **上まぶたの線が全体に低いとき**：`face.env` に `UP_RAISE=4` のように書きます（中央を何 px 上げるか）。
+- **目頭や目尻だけがずれているとき**：作業フォルダに `corner_adjust.txt` を作り、1 行に `目 角 横 縦` を書きます。目は `0`（画面の左の目）か `1`、角は `inner`（目頭）か `outer`（目尻）、横と縦は拡大前の画像座標の px です（左と上へはマイナス。`check.jpg` は 2 倍、`check_corners.jpg` は 6 倍に拡大されています）。例：`0 inner -6 -13`。なお、補正をやめるときは `work/myface/out/lidfit/corner_adjust.txt` も削除してください。
+- **口の線が大きくずれているとき**：口は手動の座標ファイルには対応していないため、元のモデルが正面を向いて口を閉じているかを見直してください。
+
+設定を直したらもう一度 `./make_face.sh work/myface` を実行します。新しい確認画像が出るので、再度確認して承認します。
+
+## できたものを見る
+
+付属のビューアで確認できます（three.js / three-vrm を CDN から読み込むため、インターネット接続が必要です）。
 
 ```bash
 python3 -m http.server 5203 --bind 127.0.0.1
 ```
 
-`http://localhost:5203/viewer/?model=../work/myface/myface.vrm` を開きます（VRM ファイルを画面へドロップしても開けます）。表情のスライダー、ARKit の 52 個、自動まばたきが使えます。目は見ている人（カメラ）の方を向きます。
+ブラウザで `http://localhost:5203/viewer/?model=../work/myface/myface.vrm` を開きます。VRM ファイルを画面へドラッグ＆ドロップして開くこともできます。表情のスライダーを動かして、まばたきや口を確かめられます。既定では元のモデルのテクスチャ色をそのまま表示し、パネルの「光を当てる」で照明ありの表示に切り替えられます。
 
-## 入力の Tripo の頭
+URL（`?model=...`）で開いた場合、このビューアは目を閉じたときのまぶたをきれいに見せる補正を使います（VRM と同じフォルダに出力される `myface-closedlid.png` と `.json`）。ドラッグ＆ドロップで開いた場合やほかのアプリではこの補正は使われませんが、VRM 単体でそのまま利用できます。
 
-- 正面を向き、口を閉じ、目を開けた顔にしてください。目は頭に描き込まれていてかまいません。まぶたの開きは Tripo が描いた線に合わせ、黒目と白目はその絵を眼球へ写します。
-- 髪は、別の部品になっていれば移植されます（部品の色から自動で見分けます。外れるときは `HAIR_PART`）。髪が頭と一体の 1 部品だと、髪の色が頭の形と肌に焼き付くので、坊主頭か髪を別部品にしたものを使ってください。
-- 顔の出来は、ほぼ Tripo の時点で決まります。作り始める前に Tripo の顔をよく見て、納得できるものを使ってください。後の工程で顔を別人のように変えることはしません。
-
-## 設定（face.env）
-
-作業フォルダの `face.env` に書きます。書かなかったものは既定値になります。
+## そのほかの設定（face.env）
 
 | 名前 | 既定 | 意味 |
 |---|---|---|
-| `NAME` | （必須） | 出力の名前（`<作業フォルダ>/<NAME>.vrm`） |
-| `HEAD_GLB` | （必須） | Tripo の頭の GLB |
-| `BASE` | `base_asian` | 素体。`base_asian`（女性）か `base_male`（男性） |
-| `BASE_SKIN` | 素体に合わせた肌 | Tripo が塗っていない所（耳の裏・体など）の肌。MPFB の `skins/` 以下のパス |
-| `HEAD_ONLY` | （なし） | `1` で首で切った頭だけにする（体・服・靴を外す） |
-| `PREP_PARTS` | 自動 | 顔に使う部品とテクスチャの置き場所（`部品番号:X0,Y0`）。書かなければ肌の色がいちばん多い部品 |
-| `HAIR_PART` | `auto` | 髪の部品。`auto`（自動で見分ける）、`none`（髪なし）、部品番号 |
-| `HAIR_SPRING` | `12` | 髪の揺れ方。数字は頭の周りに並べる骨の列の数、`0` で揺らさない、`updo:<セル>` はまとめ髪 |
-| `ROOT_RGB` | 髪の色から | 髪の下の頭皮を塗る色（`R,G,B`） |
-| `UP_RAISE` | `0` | 上まぶたの線を、中央で何 px 上げるか |
-| `LIPS` | `paint` | `paint`：唇を Tripo の色で塗り直し、つやを足す。`keep`：Tripo のまま |
-| `LASHES` | `painted` | `painted`：Tripo が描いたまつ毛のまま。`3d`：まつ毛を立体で生やす |
-| `SLIM_GAIN` / `PORTRAIT` | `0` / — | `1.0` で、顔の下半分を元の肖像画（`PORTRAIT`）の輪郭へ寄せる（Tripo の顔が丸くなったとき） |
-| `VRM_NAME` / `VRM_AUTHOR` | `NAME` / `unknown` | VRM のメタ情報の名前と作者 |
+| `BASE` | `base_asian` | 素体：`base_asian`（女性）か `base_male`（男性） |
+| `HEAD_ONLY` | なし | 空でない値（例：`1`）を指定すると、体と服を外して首から上だけの VRM にする（無効にする場合は行を書かない） |
+| `UP_RAISE` | `0` | 上まぶたの線を中央で何 px 上げるか |
+| `HAIR_SPRING` | `12` | 髪の揺れる骨（スプリングボーン）の本数。`0` で揺らさない |
+| `LIPS` | `paint` | `keep` にすると、唇を元のモデルの色のままにする |
+| `CORNEA` | `1` | `0` にすると、目の表面の透過つやを無効にする |
+| `VRM_AUTHOR` | `unknown` | VRM に書き込む作者名 |
 
-細かい調整（ふだんは触らなくてよいもの）：
-
-| 名前 | 既定 | 意味 |
-|---|---|---|
-| `LIP_SYM` | `1` | 下唇の外側の線を左右対称にそろえる |
-| `WHITE_ONLY` | `1` | 黒目の外側を、すべて Tripo の白目の平均色で塗る（白目に肌やまぶたの色が写るのを防ぐ） |
-| `CORNEA` | `1` | 角膜をつやのある透明な材質にする（`0` で眼球と同じ材質） |
-| `BLINK_BROW` | `1` | 目を閉じるとき眉を動かさない（眉が低い顔で、眉の毛がまぶたに伸びるのを防ぐ） |
-
-`corner_adjust.txt`（任意、作業フォルダに置く）：1 行に `目 角 DX DY` と書きます。目は 0 が画面の左の目、角は `inner` か `outer`、DX・DY は確認画像の px です。例：`0 inner -6 -13`。
-
-環境変数：`BLENDER`（Blender の実行ファイル）、`MPFB_DATA`（MPFB の素材フォルダ。既定は `~/Library/Application Support/Blender/5.2/extensions/.user/blender_org/mpfb/data`）。
-
-## 既知の癖
+## 既知の問題
 
 - 「あ」「お」の口で、舌が前に出て見えることがあります。
-- 首の継ぎ目で、顔の色と体の素体の肌の色が少し違うことがあります。
-- 閉じたまぶたに、Tripo が描いたまぶたのしわが少し伸びて見えます。
-- 角膜の透明な層は glTF の透過（`KHR_materials_transmission`）を使います。対応していないアプリでは、目が白っぽく見える可能性があります（`CORNEA=0` で外せます）。
-- macOS でしか確かめていません（`md5 -q`、Blender と素材の既定の場所）。
-
-## 中身
-
-```
-make_face.sh        全体の手順（部品の見分け → 形の合わせ → 色の仕上げ → 髪 → VRM の書き出し）
-check.sh            事前チェック
-setup.sh            仮想環境・モデルの取得・素体の画像の付け替え
-face.env.example    設定の見本
-viewer/             確認用のビューア（three.js + three-vrm）
-tools/tripo/        Tripo の頭への合わせ（run.sh が順に呼ぶ）、まぶた・口・鼻、色の焼き付け、目の投影、唇、まばたきの直し
-tools/tripo/hair/   髪の部品の見分け・移植・揺れ・頭皮の塗り
-tools/mpfb/         素体（base_asian/・base_male/：ARKit の 52 キー入りの体と、顔の特徴点の対応）、合わせの適用、VRM の書き出し
-tools/head_only.py  首で切ってふたをし、体・服・靴を外す（HEAD_ONLY=1）
-.claude/skills/make-face/   Claude Code で作業するときの手順と確認の決まり
-```
-
-素体を作り直すための `tools/mpfb/build.py`（MPFB で素体を組む）、`add_arkit.py`（ARKit の 52 キーを足す）、`corr.py`（特徴点の対応）も入れてありますが、ふだんの手順では使いません。
+- VRM は腕を水平に上げた T ポーズで保存されます。腕を上げたままだと、首の横の肩が盛り上がって見えます（付属のビューアは腕を下ろして表示します）。
+- 首の継ぎ目で、顔と体の肌の色が少し違うことがあります。
+- 目を閉じたとき、まぶたの肌が少し角ばって見えることがあります。
+- 目の表面のつやに glTF の透過拡張（`KHR_materials_transmission`）を使っています。対応していないアプリでは目が白っぽく見えることがあるため、その場合は `face.env` に `CORNEA=0` と書いて作り直してください。
+- 髪は、髪として認識された 1 つの部品だけをそのまま載せます。複数の髪部品や髪留めなど、ほかの部品は載りません（金髪・白髪など肌色に近い髪は自動判定から外れることがあります）。
+- macOS でしか動作確認していません。
 
 ## ライセンス
 
-このリポジトリのスクリプトは [MIT License](LICENSE) です。使っているもの：
+- このリポジトリのスクリプトは [MIT License](LICENSE) です。
+- 同梱している素体データ（`tools/mpfb/base_asian/`・`tools/mpfb/base_male/`）は、MakeHuman system assets（CC0）から作成したものです。
 
-- **MPFB**（GPL-3.0）：同梱していません。Blender の拡張機能として各自で入れます。`tools/mpfb/` の一部のスクリプト（`build.py`・`add_arkit.py`・`settex.py`）は MPFB の API を呼びます。
-- **MakeHuman system assets**（CC0）：同梱していません。`tools/mpfb/base_asian/`・`base_male/` の素体は、これから作ったものです。
-- **MediaPipe Face Landmarker**（Apache-2.0）：`setup.sh` が取得します。
-- **VRM format アドオン**（MIT）、**three.js**（MIT）、**three-vrm**（MIT）：同梱していません。
-- 入力の Tripo のモデルと、そこから作った VRM の扱いは、Tripo の利用規約に従ってください。
+次のソフトウェア・モデルはリポジトリに同梱しておらず、それぞれのライセンスに従います。
+
+- MPFB（GPL-3.0）および MakeHuman system assets（CC0）：Blender に各自で導入します。
+- MediaPipe Face Landmarker（Apache-2.0）：`setup.sh` が取得します。
+- VRM format アドオン、three.js、three-vrm（いずれも MIT）。
+
+元の 3D モデルおよびそこから生成した VRM の扱いは、元のモデルの利用条件に従ってください。
