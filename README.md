@@ -1,6 +1,16 @@
-# face-maker：顔の 3D モデルから VRM アバターを作る
+[English](README.en.md)
+
+このプロジェクトはすべてVibe Codingで作っているので中身は見ていません。セットアップもAIが書いたもので確かめていません。
+ご利用される場合はご自身で利用されているAIで確認してご利用ください。
+
+
+# head2vrm：顔の 3D モデルから VRM アバターを作る
 
 頭の 3D モデル（GLB）から、まばたき・口・表情が動く VRM 1.0 のアバターを作るツールです。顔の見た目は元のモデルのまま、体と服は付属の素体のものになります。
+
+| インプット（頭の 3D モデル / GLB） | アウトプット（生成された VRM アバター） |
+| :---: | :---: |
+| ![インプットの頭 GLB](docs/input_turntable.gif) | ![生成後の VRM アバター](docs/output_turntable.gif) |
 
 - まばたき、視線、あいうえおの口、VRM の標準の表情（笑顔・怒り・悲しみ・驚き）が動きます。
 - iPhone の顔トラッキング（ARKit）の 52 個の表情にも対応しています。
@@ -20,8 +30,8 @@
 リポジトリを取得したあと、最初に一度だけセットアップを実行します。必要なパッケージと学習済みモデル（MediaPipe Face Landmarker、約 3.6MB）を取得し、環境チェックを行います。足りないものがあれば直し方が表示されます。
 
 ```bash
-git clone <このリポジトリの URL>
-cd face-maker
+git clone https://github.com/uemegu/head2vrm.git
+cd head2vrm
 ./setup.sh
 ```
 
